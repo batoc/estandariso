@@ -151,7 +151,8 @@ export default function NoConformidadesPage() {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'cerrada': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'en_proceso': return 'text-blue-600 bg-blue-50 border-blue-100';
+      case 'en_analisis':
+      case 'en_implementacion': return 'text-blue-600 bg-blue-50 border-blue-100';
       default: return 'text-slate-600 bg-slate-50 border-slate-100';
     }
   };
@@ -208,7 +209,7 @@ export default function NoConformidadesPage() {
             <div>
               <p className="text-sm font-medium text-slate-500">En Proceso</p>
               <p className="text-2xl font-bold text-slate-800">
-                {noConformidades.filter(nc => nc.estado === 'en_proceso').length}
+                {noConformidades.filter(nc => ['en_analisis', 'en_implementacion'].includes(nc.estado)).length}
               </p>
             </div>
             <div className="p-3 bg-amber-50 rounded-lg">
@@ -454,7 +455,8 @@ export default function NoConformidadesPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="abierta">Abierta</option>
-                    <option value="en_proceso">En Proceso</option>
+                    <option value="en_analisis">En Análisis</option>
+                    <option value="en_implementacion">En Implementación</option>
                     <option value="cerrada">Cerrada</option>
                   </select>
                 </div>

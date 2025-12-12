@@ -158,8 +158,8 @@ export default function ProveedoresPage() {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'aprobado': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'condicionado': return 'text-amber-600 bg-amber-50 border-amber-100';
-      case 'rechazado': return 'text-red-600 bg-red-50 border-red-100';
+      case 'condicional': return 'text-amber-600 bg-amber-50 border-amber-100';
+      case 'no_aprobado': return 'text-red-600 bg-red-50 border-red-100';
       default: return 'text-slate-600 bg-slate-50 border-slate-100';
     }
   };
@@ -216,7 +216,7 @@ export default function ProveedoresPage() {
             <div>
               <p className="text-sm font-medium text-slate-500">Condicionados</p>
               <p className="text-2xl font-bold text-slate-800">
-                {proveedores.filter(p => p.estado === 'condicionado').length}
+                {proveedores.filter(p => p.estado === 'condicional').length}
               </p>
             </div>
             <div className="p-3 bg-amber-50 rounded-lg">
@@ -229,7 +229,7 @@ export default function ProveedoresPage() {
             <div>
               <p className="text-sm font-medium text-slate-500">Rechazados</p>
               <p className="text-2xl font-bold text-slate-800">
-                {proveedores.filter(p => p.estado === 'rechazado').length}
+                {proveedores.filter(p => p.estado === 'no_aprobado').length}
               </p>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
@@ -491,8 +491,8 @@ export default function ProveedoresPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="aprobado">Aprobado</option>
-                    <option value="condicionado">Condicionado</option>
-                    <option value="rechazado">Rechazado</option>
+                    <option value="condicional">Condicional</option>
+                    <option value="no_aprobado">No Aprobado</option>
                   </select>
                 </div>
               </div>

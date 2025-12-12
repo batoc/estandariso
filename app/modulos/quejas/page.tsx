@@ -139,7 +139,7 @@ export default function QuejasPage() {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'cerrada': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'en_proceso': return 'text-blue-600 bg-blue-50 border-blue-100';
+      case 'en_analisis': return 'text-blue-600 bg-blue-50 border-blue-100';
       default: return 'text-slate-600 bg-slate-50 border-slate-100';
     }
   };
@@ -423,7 +423,7 @@ export default function QuejasPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="abierta">Abierta</option>
-                    <option value="en_proceso">En Proceso</option>
+                    <option value="en_analisis">En Análisis</option>
                     <option value="cerrada">Cerrada</option>
                   </select>
                 </div>
