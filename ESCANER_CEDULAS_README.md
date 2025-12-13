@@ -36,9 +36,10 @@ Tabla `cedulas_demo` creada con:
 
 #### 🎥 Página de Escaneo (`/escaner/page.tsx`)
 - Botón "Activar Cámara" → solicita permisos y abre video en vivo
+- **Modo Alta Resolución Forzado**: Se solicitan constraints de video HD (1280x720 mínimo) para poder resolver las líneas finas del PDF417.
 - Video en vivo con aspecto 4:3 y guía visual
 - Lector PDF417 configurado con `BrowserMultiFormatReader` y hints `TRY_HARDER`
-- Detección automática de códigos usando `decodeFromVideoDevice`
+- Detección automática de códigos usando `decodeFromConstraints`
 - Feedback visual y vibración al detectar
 
 #### 💾 Almacenamiento

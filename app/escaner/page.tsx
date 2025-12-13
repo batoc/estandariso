@@ -67,11 +67,19 @@ export default function EscanerPage() {
 
       const codeReader = new BrowserMultiFormatReader(hints);
 
-      // Iniciar decodificación desde cámara
-      // undefined = cámara por defecto (usualmente trasera en móviles si facingMode no se especifica, 
-      // pero zxing intenta buscar la trasera)
-      const controls = await codeReader.decodeFromVideoDevice(
-        undefined, 
+      // Configuración de Alta Resolución (CRÍTICO para PDF417)
+      const constraints = {
+        video: {
+          facingMode: 'environment', // Cámara trasera
+          width: { min: 1280, ideal: 1920 }, // Mínimo HD, ideal Full HD
+          height: { min: 720, ideal: 1080 },
+          focusMode: 'continuous' // Intento de forzar enfoque continuo (no soportado en todos los navegadores)
+        }
+      };
+
+      // Usar decodeFromConstraints en lugar de decodeFromVideoDevice para forzar resolución
+      const controls = await codeReader.decodeFromConstraints(
+        constraints,
         videoRef.current!,
         (result, error, controls) => {
           if (result) {
@@ -89,7 +97,6 @@ export default function EscanerPage() {
             // Feedback vibración (si soportado)
             if (navigator.vibrate) navigator.vibrate(200);
           }
-          // Los errores de "NotFoundException" son normales mientras busca, los ignoramos
         }
       );
       
@@ -243,9 +250,14 @@ export default function EscanerPage() {
           </div>
 
           {scanning && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-700 animate-pulse">
-              <Loader2 className="animate-spin" size={18} />
-              Buscando código PDF417... Mantén la cédula quieta.
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col gap-1 text-sm text-blue-700 animate-pulse">
+              <div className="flex items-center gap-2 font-bold">
+                <Loader2 className="animate-spin" size={18} />
+                Modo Alta Resolución (HD) Activo
+              </div>
+              <p className="pl-6 text-xs">
+                El código PDF417 requiere mucho detalle. Si no detecta, <strong>aleja o acerca lentamente</strong> la cámara para ayudar al enfoque.
+              </p>
             </div>
           )}
         </div>
