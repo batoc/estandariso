@@ -14,8 +14,10 @@ import {
   Box, 
   ShieldAlert, 
   Lightbulb,
+  TrendingUp,
   Plus,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -168,19 +170,30 @@ export default function DashboardPage() {
               <ShieldAlert className="w-6 h-6 text-fuchsia-600" />
             </div>
           </div>
-          <h3 className="font-bold text-slate-800 mb-1">Riesgos y Oportunidades</h3>
-          <p className="text-xs font-medium text-slate-400">Cláusula 9.3.2.e</p>
+          <h3 className="font-bold text-slate-800 mb-1">Riesgos</h3>
+          <p className="text-xs font-medium text-slate-400">Cláusula 6.1</p>
+        </Link>
+
+        {/* 9.3.2.e - Oportunidades */}
+        <Link href="/oportunidades" className="module-card group">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
+              <Lightbulb className="w-6 h-6 text-amber-600" />
+            </div>
+          </div>
+          <h3 className="font-bold text-slate-800 mb-1">Oportunidades</h3>
+          <p className="text-xs font-medium text-slate-400">Cláusula 6.1</p>
         </Link>
 
         {/* 9.3.2.f - Mejoras */}
         <Link href="/mejoras" className="module-card group">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
-              <Lightbulb className="w-6 h-6 text-yellow-600" />
+              <TrendingUp className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
-          <h3 className="font-bold text-slate-800 mb-1">Oportunidades Mejora</h3>
-          <p className="text-xs font-medium text-slate-400">Cláusula 9.3.2.f</p>
+          <h3 className="font-bold text-slate-800 mb-1">Mejora Continua</h3>
+          <p className="text-xs font-medium text-slate-400">Cláusula 10.3</p>
         </Link>
       </div>
 
@@ -197,6 +210,34 @@ export default function DashboardPage() {
               Para realizar una nueva revisión, haga clic en el botón <strong className="text-blue-600">Nueva Revisión</strong>.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div className="my-8 border-t border-slate-200"></div>
+
+      {/* Módulos Experimentales (Separados) */}
+      <div className="mt-8">
+        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <Lightbulb size={20} className="text-yellow-600" />
+          Módulos Experimentales
+        </h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Herramientas complementarias, independientes del sistema de gestión de calidad.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Escáner de Cédulas */}
+          <Link href="/escaner" className="module-card group border-2 border-dashed border-purple-300 hover:border-purple-500">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Camera className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+            <h3 className="font-bold text-slate-800 mb-1">Escáner de Cédulas</h3>
+            <p className="text-xs font-medium text-slate-500">PDF417 en tiempo real (BETA)</p>
+            <p className="text-xs text-slate-400 mt-2">Módulo independiente para prueba de lectura de cédulas colombianas</p>
+          </Link>
         </div>
       </div>
     </div>

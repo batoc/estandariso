@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Proveedor } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import {
@@ -22,26 +21,23 @@ import {
   Trash2,
   ArrowLeft,
   Package,
-  ShieldCheck
+  ShieldCheck,
+  Mail,
+  Phone,
+  MapPin
 } from 'lucide-react';
 
 export default function ProveedoresPage() {
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [proveedores, setProveedores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editando, setEditando] = useState<Proveedor | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     nombre_proveedor: '',
     categoria: 'materias_primas',
     calificacion_actual: 0,
     fecha_evaluacion: new Date().toISOString().split('T')[0],
-    criterios: {
-      calidad: 0,
-      entrega: 0,
-      precio: 0,
-      servicio: 0
-    },
     estado: 'aprobado',
     incidentes_totales: 0,
     observaciones: ''
@@ -51,19 +47,12 @@ export default function ProveedoresPage() {
     fetchProveedores();
   }, []);
 
-  useEffect(() => {
-    // Calcular calificación promedio automáticamente
-    const { calidad, entrega, precio, servicio } = formData.criterios;
-    const promedio = (calidad + entrega + precio + servicio) / 4;
-    setFormData(prev => ({ ...prev, calificacion_actual: parseFloat(promedio.toFixed(2)) }));
-  }, [formData.criterios]);
-
   const fetchProveedores = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('proveedores')
       .select('*')
-      .order('calificacion_actual', { ascending: false });
+      .order('nombre_proveedor');
 
     if (!error && data) {
       setProveedores(data);
@@ -75,21 +64,16 @@ export default function ProveedoresPage() {
     e.preventDefault();
     
     const dataToSave = {
-      nombre_proveedor: formData.nombre_proveedor,
-      categoria: formData.categoria,
-      calificacion_actual: formData.calificacion_actual,
-      fecha_evaluacion: formData.fecha_evaluacion,
-      criterios_evaluacion: formData.criterios,
-      estado: formData.estado,
-      incidentes_totales: formData.incidentes_totales,
-      observaciones: formData.observaciones
+      ...formData,
+      calificacion_actual: Number(formData.calificacion_actual),
+      incidentes_totales: Number(formData.incidentes_totales)
     };
 
-    if (editando) {
+    if (editingId) {
       const { error } = await supabase
         .from('proveedores')
         .update(dataToSave)
-        .eq('id', editando.id);
+        .eq('id', editingId);
       
       if (!error) {
         fetchProveedores();
@@ -107,31 +91,24 @@ export default function ProveedoresPage() {
     }
   };
 
-  const handleEdit = (proveedor: Proveedor) => {
-    setEditando(proveedor);
+  const handleEdit = (proveedor: any) => {
+    setEditingId(proveedor.id);
     setFormData({
-      nombre_proveedor: proveedor.nombre_proveedor,
-      categoria: proveedor.categoria,
-      calificacion_actual: proveedor.calificacion_actual,
-      fecha_evaluacion: proveedor.fecha_evaluacion,
-      criterios: proveedor.criterios_evaluacion,
-      estado: proveedor.estado,
-      incidentes_totales: proveedor.incidentes_totales,
+      nombre_proveedor: proveedor.nombre_proveedor || '',
+      categoria: proveedor.categoria || 'materias_primas',
+      calificacion_actual: proveedor.calificacion_actual || 0,
+      fecha_evaluacion: proveedor.fecha_evaluacion || new Date().toISOString().split('T')[0],
+      estado: proveedor.estado || 'aprobado',
+      incidentes_totales: proveedor.incidentes_totales || 0,
       observaciones: proveedor.observaciones || ''
     });
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('¿Estás seguro de eliminar este proveedor?')) {
-      const { error } = await supabase
-        .from('proveedores')
-        .delete()
-        .eq('id', id);
-      
-      if (!error) {
-        fetchProveedores();
-      }
+    if (confirm('¿Eliminar este registro?')) {
+      const { error } = await supabase.from('proveedores').delete().eq('id', id);
+      if (!error) fetchProveedores();
     }
   };
 
@@ -141,27 +118,12 @@ export default function ProveedoresPage() {
       categoria: 'materias_primas',
       calificacion_actual: 0,
       fecha_evaluacion: new Date().toISOString().split('T')[0],
-      criterios: {
-        calidad: 0,
-        entrega: 0,
-        precio: 0,
-        servicio: 0
-      },
       estado: 'aprobado',
       incidentes_totales: 0,
       observaciones: ''
     });
-    setEditando(null);
+    setEditingId(null);
     setShowForm(false);
-  };
-
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'aprobado': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'condicional': return 'text-amber-600 bg-amber-50 border-amber-100';
-      case 'no_aprobado': return 'text-red-600 bg-red-50 border-red-100';
-      default: return 'text-slate-600 bg-slate-50 border-slate-100';
-    }
   };
 
   return (
@@ -172,9 +134,9 @@ export default function ProveedoresPage() {
             <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Gestión de Proveedores</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Proveedores</h1>
           </div>
-          <p className="text-slate-500 ml-7">Evaluación y seguimiento de proveedores externos</p>
+          <p className="text-slate-500 ml-7">Gestión y evaluación de proveedores externos (8.4)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -207,33 +169,35 @@ export default function ProveedoresPage() {
               </p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-lg">
-              <ShieldCheck className="text-emerald-600" size={24} />
+              <CheckCircle2 className="text-emerald-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-amber-500">
+        <div className="card p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Condicionados</p>
+              <p className="text-sm font-medium text-slate-500">Calif. Promedio</p>
               <p className="text-2xl font-bold text-slate-800">
-                {proveedores.filter(p => p.estado === 'condicional').length}
+                {proveedores.length > 0 
+                  ? (proveedores.reduce((acc, curr) => acc + (curr.calificacion_actual || 0), 0) / proveedores.length).toFixed(1)
+                  : '0.0'}
               </p>
             </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <AlertCircle className="text-amber-600" size={24} />
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <Star className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-red-500">
+        <div className="card p-4 border-l-4 border-rose-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Rechazados</p>
+              <p className="text-sm font-medium text-slate-500">Con Incidentes</p>
               <p className="text-2xl font-bold text-slate-800">
-                {proveedores.filter(p => p.estado === 'no_aprobado').length}
+                {proveedores.filter(p => (p.incidentes_totales || 0) > 0).length}
               </p>
             </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <XCircle className="text-red-600" size={24} />
+            <div className="p-3 bg-rose-50 rounded-lg">
+              <AlertCircle className="text-rose-600" size={24} />
             </div>
           </div>
         </div>
@@ -242,12 +206,12 @@ export default function ProveedoresPage() {
       {/* Main Content */}
       <div className="card">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold text-slate-800">Listado de Proveedores</h3>
+          <h3 className="font-bold text-slate-800">Directorio de Proveedores</h3>
           <div className="relative max-w-md w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar proveedor..."
+              placeholder="Buscar..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -257,98 +221,88 @@ export default function ProveedoresPage() {
           <div className="p-12 text-center text-slate-500">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="animate-spin" size={24} />
-              Cargando proveedores...
+              Cargando datos...
             </div>
           </div>
         ) : proveedores.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            No hay proveedores registrados
+            No hay registros
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {proveedores.map((proveedor) => (
-              <div key={proveedor.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-800 text-lg">{proveedor.nombre_proveedor}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full capitalize">
-                        {proveedor.categoria.replace('_', ' ')}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Proveedor</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Categoría</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Evaluación</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Calificación</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {proveedores.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-slate-900">{item.nombre_proveedor}</span>
+                        <span className="text-xs text-slate-500">{item.observaciones}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold capitalize ${
+                        item.categoria === 'materias_primas' ? 'bg-blue-100 text-blue-700' :
+                        item.categoria === 'servicios' ? 'bg-purple-100 text-purple-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {item.categoria?.replace(/_/g, ' ')}
                       </span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${getEstadoColor(proveedor.estado)} capitalize`}>
-                        {proveedor.estado}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-slate-700">{item.fecha_evaluacion}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <span className={`font-bold ${
+                          (item.calificacion_actual || 0) >= 90 ? 'text-emerald-600' :
+                          (item.calificacion_actual || 0) >= 70 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {item.calificacion_actual}
+                        </span>
+                        <span className="text-slate-400">/ 100</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        item.estado === 'aprobado' ? 'bg-emerald-100 text-emerald-700' :
+                        item.estado === 'condicional' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {item.estado?.replace(/_/g, ' ')}
                       </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-1 text-amber-500 font-bold text-lg">
-                      <Star size={20} fill="currentColor" />
-                      {proveedor.calificacion_actual}
-                    </div>
-                    <span className="text-xs text-slate-400">Calificación</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="p-2 bg-slate-50 rounded-lg text-center">
-                    <p className="text-xs text-slate-500 mb-1">Calidad</p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
-                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(proveedor.criterios_evaluacion.calidad / 100) * 100}%` }}></div>
-                    </div>
-                    <span className="text-sm font-bold text-slate-700">{proveedor.criterios_evaluacion.calidad}</span>
-                  </div>
-                  <div className="p-2 bg-slate-50 rounded-lg text-center">
-                    <p className="text-xs text-slate-500 mb-1">Entrega</p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
-                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(proveedor.criterios_evaluacion.entrega / 100) * 100}%` }}></div>
-                    </div>
-                    <span className="text-sm font-bold text-slate-700">{proveedor.criterios_evaluacion.entrega}</span>
-                  </div>
-                  <div className="p-2 bg-slate-50 rounded-lg text-center">
-                    <p className="text-xs text-slate-500 mb-1">Precio</p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
-                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(proveedor.criterios_evaluacion.precio / 100) * 100}%` }}></div>
-                    </div>
-                    <span className="text-sm font-bold text-slate-700">{proveedor.criterios_evaluacion.precio}</span>
-                  </div>
-                  <div className="p-2 bg-slate-50 rounded-lg text-center">
-                    <p className="text-xs text-slate-500 mb-1">Servicio</p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
-                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(proveedor.criterios_evaluacion.servicio / 100) * 100}%` }}></div>
-                    </div>
-                    <span className="text-sm font-bold text-slate-700">{proveedor.criterios_evaluacion.servicio}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-4 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    Evaluado: {proveedor.fecha_evaluacion}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <AlertCircle size={14} className={proveedor.incidentes_totales > 0 ? 'text-red-500' : 'text-slate-400'} />
-                    Incidentes: {proveedor.incidentes_totales}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(proveedor)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Edit size={16} />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(proveedor.id)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={16} />
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -356,10 +310,10 @@ export default function ProveedoresPage() {
       {/* Modal Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-slate-800">
-                {editando ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+                {editingId ? 'Editar Proveedor' : 'Nuevo Proveedor'}
               </h2>
               <button 
                 onClick={resetForm}
@@ -372,120 +326,57 @@ export default function ProveedoresPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Proveedor *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre Proveedor</label>
                   <input
                     type="text"
-                    required
                     value={formData.nombre_proveedor}
                     onChange={(e) => setFormData({...formData, nombre_proveedor: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej. Suministros Industriales SA"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoría *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                   <select
-                    required
                     value={formData.categoria}
                     onChange={(e) => setFormData({...formData, categoria: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="materias_primas">Materias Primas</option>
                     <option value="servicios">Servicios</option>
-                    <option value="logistica">Logística</option>
-                    <option value="mantenimiento">Mantenimiento</option>
+                    <option value="equipos">Equipos</option>
+                    <option value="transporte">Transporte</option>
+                    <option value="otros">Otros</option>
                   </select>
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <h4 className="font-medium text-slate-800 mb-4 flex items-center gap-2">
-                  <Star size={18} className="text-amber-500" />
-                  Criterios de Evaluación (0-100)
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Calidad</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.criterios.calidad}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        criterios: { ...formData.criterios, calidad: parseInt(e.target.value) || 0 }
-                      })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Entrega</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.criterios.entrega}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        criterios: { ...formData.criterios, entrega: parseInt(e.target.value) || 0 }
-                      })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Precio</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.criterios.precio}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        criterios: { ...formData.criterios, precio: parseInt(e.target.value) || 0 }
-                      })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Servicio</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      required
-                      value={formData.criterios.servicio}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        criterios: { ...formData.criterios, servicio: parseInt(e.target.value) || 0 }
-                      })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-600">Calificación Promedio:</span>
-                  <span className="text-xl font-bold text-blue-600">{formData.calificacion_actual}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Evaluación *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Evaluación</label>
                   <input
                     type="date"
-                    required
                     value={formData.fecha_evaluacion}
                     onChange={(e) => setFormData({...formData, fecha_evaluacion: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Estado *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Calificación (0-100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.calificacion_actual}
+                    onChange={(e) => setFormData({...formData, calificacion_actual: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
                   <select
-                    required
                     value={formData.estado}
                     onChange={(e) => setFormData({...formData, estado: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -495,27 +386,24 @@ export default function ProveedoresPage() {
                     <option value="no_aprobado">No Aprobado</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Incidentes Totales</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.incidentes_totales}
-                  onChange={(e) => setFormData({...formData, incidentes_totales: parseInt(e.target.value) || 0})}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Incidentes Totales</label>
+                  <input
+                    type="number"
+                    value={formData.incidentes_totales}
+                    onChange={(e) => setFormData({...formData, incidentes_totales: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
                 <textarea
-                  rows={3}
                   value={formData.observaciones}
                   onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
+                  rows={3}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  placeholder="Notas adicionales..."
                 />
               </div>
 
@@ -532,7 +420,7 @@ export default function ProveedoresPage() {
                   className="btn-primary flex items-center gap-2"
                 >
                   <Save size={18} />
-                  {editando ? 'Actualizar' : 'Guardar'}
+                  {editingId ? 'Actualizar' : 'Guardar'}
                 </button>
               </div>
             </form>

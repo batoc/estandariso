@@ -22,34 +22,13 @@ import {
   BarChart2,
   Smile,
   Meh,
-  Frown
+  Frown,
+  Send,
+  Link as LinkIcon
 } from 'lucide-react';
 
-interface EncuestaSatisfaccion {
-  id: number;
-  created_at: string;
-  fecha_encuesta: string;
-  periodo?: string;
-  cliente: string;
-  tipo_cliente?: string;
-  metodo_aplicacion?: string;
-  calidad_producto?: number;
-  servicio_atencion?: number;
-  tiempos_entrega?: number;
-  precio_valor?: number;
-  comunicacion?: number;
-  resolucion_problemas?: number;
-  satisfaccion_general?: number;
-  nps_score?: number;
-  comentarios?: string;
-  areas_mejora_identificadas?: string;
-  responsable_seguimiento?: string;
-  acciones_tomadas?: string;
-  estado: string;
-}
-
 export default function EncuestasSatisfaccionPage() {
-  const [encuestas, setEncuestas] = useState<EncuestaSatisfaccion[]>([]);
+  const [encuestas, setEncuestas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -58,16 +37,16 @@ export default function EncuestasSatisfaccionPage() {
     fecha_encuesta: new Date().toISOString().split('T')[0],
     periodo: '',
     cliente: '',
-    tipo_cliente: 'recurrente',
-    metodo_aplicacion: 'online',
-    calidad_producto: 0,
-    servicio_atencion: 0,
-    tiempos_entrega: 0,
-    precio_valor: 0,
-    comunicacion: 0,
-    resolucion_problemas: 0,
-    satisfaccion_general: 0,
-    nps_score: 0,
+    tipo_cliente: 'usuario_final',
+    metodo_aplicacion: 'email',
+    calidad_producto: 5,
+    servicio_atencion: 5,
+    tiempos_entrega: 5,
+    precio_valor: 5,
+    comunicacion: 5,
+    resolucion_problemas: 5,
+    satisfaccion_general: 5,
+    nps_score: 10,
     comentarios: '',
     areas_mejora_identificadas: '',
     responsable_seguimiento: '',
@@ -80,15 +59,28 @@ export default function EncuestasSatisfaccionPage() {
   }, []);
 
   useEffect(() => {
-    // Calcular satisfacción general automáticamente si no se ingresa manualmente
-    const { calidad_producto, servicio_atencion, tiempos_entrega, precio_valor, comunicacion, resolucion_problemas } = formData;
-    const valores = [calidad_producto, servicio_atencion, tiempos_entrega, precio_valor, comunicacion, resolucion_problemas].filter(v => v > 0);
+    // Calcular satisfacción general promedio si no se establece manualmente
+    const promedio = (
+      Number(formData.calidad_producto) +
+      Number(formData.servicio_atencion) +
+      Number(formData.tiempos_entrega) +
+      Number(formData.precio_valor) +
+      Number(formData.comunicacion) +
+      Number(formData.resolucion_problemas)
+    ) / 6;
     
-    if (valores.length > 0) {
-      const promedio = valores.reduce((a, b) => a + b, 0) / valores.length;
-      setFormData(prev => ({ ...prev, satisfaccion_general: parseFloat(promedio.toFixed(1)) }));
-    }
-  }, [formData.calidad_producto, formData.servicio_atencion, formData.tiempos_entrega, formData.precio_valor, formData.comunicacion, formData.resolucion_problemas]);
+    setFormData(prev => ({
+      ...prev,
+      satisfaccion_general: Number(promedio.toFixed(1))
+    }));
+  }, [
+    formData.calidad_producto,
+    formData.servicio_atencion,
+    formData.tiempos_entrega,
+    formData.precio_valor,
+    formData.comunicacion,
+    formData.resolucion_problemas
+  ]);
 
   const cargarEncuestas = async () => {
     try {
@@ -100,7 +92,7 @@ export default function EncuestasSatisfaccionPage() {
       if (error) throw error;
       setEncuestas(data || []);
     } catch (error) {
-      console.error('Error cargando encuestas:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -108,67 +100,68 @@ export default function EncuestasSatisfaccionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
+      const dataToSave = {
+        ...formData,
+        calidad_producto: Number(formData.calidad_producto),
+        servicio_atencion: Number(formData.servicio_atencion),
+        tiempos_entrega: Number(formData.tiempos_entrega),
+        precio_valor: Number(formData.precio_valor),
+        comunicacion: Number(formData.comunicacion),
+        resolucion_problemas: Number(formData.resolucion_problemas),
+        satisfaccion_general: Number(formData.satisfaccion_general),
+        nps_score: Number(formData.nps_score)
+      };
+
       if (editingId) {
         const { error } = await supabase
           .from('encuestas_satisfaccion')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('encuestas_satisfaccion')
-          .insert([formData]);
+          .insert([dataToSave]);
         if (error) throw error;
       }
-      
-      await cargarEncuestas();
+      cargarEncuestas();
       resetForm();
     } catch (error) {
-      console.error('Error guardando encuesta:', error);
-      alert('Error al guardar la encuesta');
+      console.error('Error:', error);
+      alert('Error al guardar');
     }
   };
 
-  const handleEdit = (encuesta: EncuestaSatisfaccion) => {
+  const handleEdit = (encuesta: any) => {
     setEditingId(encuesta.id);
     setFormData({
-      fecha_encuesta: encuesta.fecha_encuesta,
+      fecha_encuesta: encuesta.fecha_encuesta || new Date().toISOString().split('T')[0],
       periodo: encuesta.periodo || '',
-      cliente: encuesta.cliente,
-      tipo_cliente: encuesta.tipo_cliente || 'recurrente',
-      metodo_aplicacion: encuesta.metodo_aplicacion || 'online',
-      calidad_producto: encuesta.calidad_producto || 0,
-      servicio_atencion: encuesta.servicio_atencion || 0,
-      tiempos_entrega: encuesta.tiempos_entrega || 0,
-      precio_valor: encuesta.precio_valor || 0,
-      comunicacion: encuesta.comunicacion || 0,
-      resolucion_problemas: encuesta.resolucion_problemas || 0,
-      satisfaccion_general: encuesta.satisfaccion_general || 0,
-      nps_score: encuesta.nps_score || 0,
+      cliente: encuesta.cliente || '',
+      tipo_cliente: encuesta.tipo_cliente || 'usuario_final',
+      metodo_aplicacion: encuesta.metodo_aplicacion || 'email',
+      calidad_producto: encuesta.calidad_producto || 5,
+      servicio_atencion: encuesta.servicio_atencion || 5,
+      tiempos_entrega: encuesta.tiempos_entrega || 5,
+      precio_valor: encuesta.precio_valor || 5,
+      comunicacion: encuesta.comunicacion || 5,
+      resolucion_problemas: encuesta.resolucion_problemas || 5,
+      satisfaccion_general: encuesta.satisfaccion_general || 5,
+      nps_score: encuesta.nps_score || 10,
       comentarios: encuesta.comentarios || '',
       areas_mejora_identificadas: encuesta.areas_mejora_identificadas || '',
       responsable_seguimiento: encuesta.responsable_seguimiento || '',
       acciones_tomadas: encuesta.acciones_tomadas || '',
-      estado: encuesta.estado
+      estado: encuesta.estado || 'pendiente'
     });
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Está seguro de eliminar esta encuesta?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('encuestas_satisfaccion')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      cargarEncuestas();
-    } catch (error) {
-      console.error('Error eliminando encuesta:', error);
+    if (confirm('¿Eliminar encuesta?')) {
+      const { error } = await supabase.from('encuestas_satisfaccion').delete().eq('id', id);
+      if (!error) cargarEncuestas();
     }
   };
 
@@ -177,16 +170,16 @@ export default function EncuestasSatisfaccionPage() {
       fecha_encuesta: new Date().toISOString().split('T')[0],
       periodo: '',
       cliente: '',
-      tipo_cliente: 'recurrente',
-      metodo_aplicacion: 'online',
-      calidad_producto: 0,
-      servicio_atencion: 0,
-      tiempos_entrega: 0,
-      precio_valor: 0,
-      comunicacion: 0,
-      resolucion_problemas: 0,
-      satisfaccion_general: 0,
-      nps_score: 0,
+      tipo_cliente: 'usuario_final',
+      metodo_aplicacion: 'email',
+      calidad_producto: 5,
+      servicio_atencion: 5,
+      tiempos_entrega: 5,
+      precio_valor: 5,
+      comunicacion: 5,
+      resolucion_problemas: 5,
+      satisfaccion_general: 5,
+      nps_score: 10,
       comentarios: '',
       areas_mejora_identificadas: '',
       responsable_seguimiento: '',
@@ -197,19 +190,6 @@ export default function EncuestasSatisfaccionPage() {
     setShowForm(false);
   };
 
-  const getSatisfaccionColor = (valor: number) => {
-    if (valor >= 4.5) return 'text-emerald-600';
-    if (valor >= 3.5) return 'text-blue-600';
-    if (valor >= 2.5) return 'text-amber-600';
-    return 'text-red-600';
-  };
-
-  const getNPSColor = (valor: number) => {
-    if (valor >= 9) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-    if (valor >= 7) return 'text-amber-600 bg-amber-50 border-amber-100';
-    return 'text-red-600 bg-red-50 border-red-100';
-  };
-
   return (
     <div className="page-container">
       <div className="flex justify-between items-center mb-8">
@@ -218,9 +198,9 @@ export default function EncuestasSatisfaccionPage() {
             <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Encuestas de Satisfacción</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Satisfacción del Cliente</h1>
           </div>
-          <p className="text-slate-500 ml-7">Medición de la percepción del cliente y NPS</p>
+          <p className="text-slate-500 ml-7">Seguimiento y medición de la satisfacción (9.1.2)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -247,10 +227,10 @@ export default function EncuestasSatisfaccionPage() {
         <div className="card p-4 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Satisfacción Prom.</p>
+              <p className="text-sm font-medium text-slate-500">Promedio Satisfacción</p>
               <p className="text-2xl font-bold text-slate-800">
-                {encuestas.length > 0
-                  ? (encuestas.reduce((acc, e) => acc + (e.satisfaccion_general || 0), 0) / encuestas.length).toFixed(1)
+                {encuestas.length > 0 
+                  ? (encuestas.reduce((acc, curr) => acc + (curr.satisfaccion_general || 0), 0) / encuestas.length).toFixed(1)
                   : '0.0'}
               </p>
             </div>
@@ -259,31 +239,31 @@ export default function EncuestasSatisfaccionPage() {
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-amber-500">
+        <div className="card p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-500">NPS Promedio</p>
               <p className="text-2xl font-bold text-slate-800">
-                {encuestas.length > 0
-                  ? (encuestas.reduce((acc, e) => acc + (e.nps_score || 0), 0) / encuestas.length).toFixed(1)
-                  : '0.0'}
+                {encuestas.length > 0 
+                  ? Math.round(encuestas.reduce((acc, curr) => acc + (curr.nps_score || 0), 0) / encuestas.length)
+                  : '0'}
               </p>
             </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <TrendingUp className="text-amber-600" size={24} />
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <TrendingUp className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-purple-500">
+        <div className="card p-4 border-l-4 border-amber-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-500">Pendientes Acción</p>
               <p className="text-2xl font-bold text-slate-800">
-                {encuestas.filter(e => e.estado === 'pendiente').length}
+                {encuestas.filter(e => e.estado === 'pendiente' || e.estado === 'en_analisis').length}
               </p>
             </div>
-            <div className="p-3 bg-purple-50 rounded-lg">
-              <CheckCircle2 className="text-purple-600" size={24} />
+            <div className="p-3 bg-amber-50 rounded-lg">
+              <CheckCircle2 className="text-amber-600" size={24} />
             </div>
           </div>
         </div>
@@ -292,12 +272,12 @@ export default function EncuestasSatisfaccionPage() {
       {/* Main Content */}
       <div className="card">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold text-slate-800">Resultados de Encuestas</h3>
+          <h3 className="font-bold text-slate-800">Registro de Encuestas</h3>
           <div className="relative max-w-md w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar cliente..."
+              placeholder="Buscar encuesta..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -315,73 +295,74 @@ export default function EncuestasSatisfaccionPage() {
             No hay encuestas registradas
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {encuestas.map((encuesta) => (
-              <div key={encuesta.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-800 text-lg">{encuesta.cliente}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full capitalize">
-                        {encuesta.tipo_cliente}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Satisfacción</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">NPS</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {encuestas.map((encuesta) => (
+                  <tr key={encuesta.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-slate-700">{encuesta.fecha_encuesta}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-slate-900">{encuesta.cliente}</span>
+                        <span className="text-xs text-slate-500">{encuesta.tipo_cliente}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <Star className="text-yellow-400 fill-yellow-400" size={16} />
+                        <span className="text-sm font-bold text-slate-700">{encuesta.satisfaccion_general}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                        encuesta.nps_score >= 9 ? 'bg-emerald-100 text-emerald-700' :
+                        encuesta.nps_score >= 7 ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {encuesta.nps_score}
                       </span>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Calendar size={12} />
-                        {encuesta.fecha_encuesta}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        encuesta.estado === 'cerrada' ? 'bg-emerald-100 text-emerald-700' :
+                        encuesta.estado === 'con_acciones' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {encuesta.estado?.replace(/_/g, ' ')}
                       </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <div className={`flex items-center gap-1 font-bold text-lg ${getSatisfaccionColor(encuesta.satisfaccion_general || 0)}`}>
-                      <Star size={20} fill="currentColor" />
-                      {encuesta.satisfaccion_general}
-                    </div>
-                    <span className="text-xs text-slate-400">Satisfacción</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="p-3 bg-slate-50 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-xs text-slate-500 mb-1">NPS Score</span>
-                    <span className={`px-2 py-0.5 text-sm font-bold rounded-full border ${getNPSColor(encuesta.nps_score || 0)}`}>
-                      {encuesta.nps_score}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-xs text-slate-500 mb-1">Estado</span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
-                      encuesta.estado === 'completado' ? 'text-emerald-600 bg-emerald-100' : 'text-amber-600 bg-amber-100'
-                    }`}>
-                      {encuesta.estado}
-                    </span>
-                  </div>
-                </div>
-
-                {encuesta.comentarios && (
-                  <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs font-medium text-slate-500 mb-1">Comentarios:</p>
-                    <p className="text-sm text-slate-600 line-clamp-2 italic">"{encuesta.comentarios}"</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => handleEdit(encuesta)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Edit size={16} />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(encuesta.id)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={16} />
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleEdit(encuesta)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(encuesta.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -389,7 +370,7 @@ export default function EncuestasSatisfaccionPage() {
       {/* Modal Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-slate-800">
                 {editingId ? 'Editar Encuesta' : 'Nueva Encuesta'}
@@ -405,36 +386,9 @@ export default function EncuestasSatisfaccionPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Cliente *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.cliente}
-                    onChange={(e) => setFormData({...formData, cliente: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Nombre del cliente"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo Cliente</label>
-                  <select
-                    value={formData.tipo_cliente}
-                    onChange={(e) => setFormData({...formData, tipo_cliente: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  >
-                    <option value="nuevo">Nuevo</option>
-                    <option value="recurrente">Recurrente</option>
-                    <option value="vip">VIP</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Encuesta *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Encuesta</label>
                   <input
                     type="date"
-                    required
                     value={formData.fecha_encuesta}
                     onChange={(e) => setFormData({...formData, fecha_encuesta: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -446,80 +400,131 @@ export default function EncuestasSatisfaccionPage() {
                     type="text"
                     value={formData.periodo}
                     onChange={(e) => setFormData({...formData, periodo: e.target.value})}
+                    placeholder="Ej: Q1-2024"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej. Q1-2024"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Método</label>
-                  <select
-                    value={formData.metodo_aplicacion}
-                    onChange={(e) => setFormData({...formData, metodo_aplicacion: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  >
-                    <option value="online">Online</option>
-                    <option value="presencial">Presencial</option>
-                    <option value="telefonica">Telefónica</option>
-                    <option value="email">Email</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <h4 className="font-medium text-slate-800 mb-4 flex items-center gap-2">
-                  <Star size={18} className="text-amber-500" />
-                  Evaluación (1-5)
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {[
-                    { label: 'Calidad Producto', key: 'calidad_producto' },
-                    { label: 'Servicio Atención', key: 'servicio_atencion' },
-                    { label: 'Tiempos Entrega', key: 'tiempos_entrega' },
-                    { label: 'Precio / Valor', key: 'precio_valor' },
-                    { label: 'Comunicación', key: 'comunicacion' },
-                    { label: 'Resolución Problemas', key: 'resolucion_problemas' }
-                  ].map((item) => (
-                    <div key={item.key}>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">{item.label}</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="5"
-                        step="0.1"
-                        value={formData[item.key as keyof typeof formData] as number}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          [item.key]: parseFloat(e.target.value) || 0
-                        })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-600">Satisfacción General:</span>
-                  <span className="text-xl font-bold text-blue-600">{formData.satisfaccion_general}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">NPS Score (0-10)</label>
-                  <div className="flex items-center gap-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
+                  <input
+                    type="text"
+                    value={formData.cliente}
+                    onChange={(e) => setFormData({...formData, cliente: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo Cliente</label>
+                  <select
+                    value={formData.tipo_cliente}
+                    onChange={(e) => setFormData({...formData, tipo_cliente: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  >
+                    <option value="usuario_final">Usuario Final</option>
+                    <option value="distribuidor">Distribuidor</option>
+                    <option value="corporativo">Corporativo</option>
+                    <option value="gobierno">Gobierno</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4">
+                <h4 className="font-bold text-slate-800 mb-4">Evaluación (1-5)</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Calidad Producto</label>
                     <input
-                      type="range"
-                      min="0"
-                      max="10"
-                      step="1"
-                      value={formData.nps_score}
-                      onChange={(e) => setFormData({...formData, nps_score: parseInt(e.target.value)})}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={formData.calidad_producto}
+                      onChange={(e) => setFormData({...formData, calidad_producto: Number(e.target.value)})}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     />
-                    <span className={`font-bold text-lg w-8 text-center rounded ${getNPSColor(formData.nps_score)}`}>
-                      {formData.nps_score}
-                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Servicio Atención</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={formData.servicio_atencion}
+                      onChange={(e) => setFormData({...formData, servicio_atencion: Number(e.target.value)})}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tiempos Entrega</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={formData.tiempos_entrega}
+                      onChange={(e) => setFormData({...formData, tiempos_entrega: Number(e.target.value)})}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Precio / Valor</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={formData.precio_valor}
+                      onChange={(e) => setFormData({...formData, precio_valor: Number(e.target.value)})}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                    />
                   </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Satisfacción General (Calc)</label>
+                  <input
+                    type="number"
+                    value={formData.satisfaccion_general}
+                    readOnly
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">NPS Score (-100 a 100)</label>
+                  <input
+                    type="number"
+                    min="-100"
+                    max="100"
+                    value={formData.nps_score}
+                    onChange={(e) => setFormData({...formData, nps_score: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios</label>
+                <textarea
+                  value={formData.comentarios}
+                  onChange={(e) => setFormData({...formData, comentarios: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Áreas de Mejora</label>
+                <textarea
+                  value={formData.areas_mejora_identificadas}
+                  onChange={(e) => setFormData({...formData, areas_mejora_identificadas: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
                   <select
@@ -528,42 +533,18 @@ export default function EncuestasSatisfaccionPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="pendiente">Pendiente</option>
-                    <option value="en_revision">En Revisión</option>
-                    <option value="completado">Completado</option>
+                    <option value="en_analisis">En Análisis</option>
+                    <option value="con_acciones">Con Acciones</option>
+                    <option value="cerrada">Cerrada</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios del Cliente</label>
-                <textarea
-                  rows={2}
-                  value={formData.comentarios}
-                  onChange={(e) => setFormData({...formData, comentarios: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  placeholder="Opiniones textuales..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Áreas de Mejora</label>
-                  <textarea
-                    rows={2}
-                    value={formData.areas_mejora_identificadas}
-                    onChange={(e) => setFormData({...formData, areas_mejora_identificadas: e.target.value})}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Responsable Seguimiento</label>
+                  <input
+                    type="text"
+                    value={formData.responsable_seguimiento}
+                    onChange={(e) => setFormData({...formData, responsable_seguimiento: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Oportunidades detectadas..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Acciones Tomadas</label>
-                  <textarea
-                    rows={2}
-                    value={formData.acciones_tomadas}
-                    onChange={(e) => setFormData({...formData, acciones_tomadas: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Seguimiento realizado..."
                   />
                 </div>
               </div>

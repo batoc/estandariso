@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import {
-  ShieldAlert,
+  Lightbulb,
   Plus,
   Search,
   Filter,
@@ -19,14 +19,13 @@ import {
   Edit,
   Trash2,
   ArrowLeft,
-  AlertTriangle,
-  Activity,
   Target,
+  Zap,
   BarChart2
 } from 'lucide-react';
 
-export default function RiesgosPage() {
-  const [riesgos, setRiesgos] = useState<any[]>([]);
+export default function OportunidadesPage() {
+  const [oportunidades, setOportunidades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -34,8 +33,8 @@ export default function RiesgosPage() {
   const [formData, setFormData] = useState({
     codigo: '',
     fecha_identificacion: new Date().toISOString().split('T')[0],
-    tipo: 'riesgo',
-    categoria: 'operacional',
+    tipo: 'oportunidad',
+    categoria: 'estrategico',
     origen: '',
     descripcion: '',
     causa_origen: '',
@@ -46,7 +45,7 @@ export default function RiesgosPage() {
     nivel_riesgo: 1,
     clasificacion_nivel: 'bajo',
     partes_interesadas: '', // Array as string
-    estrategia: 'reducir',
+    estrategia: 'explotar',
     acciones_planificadas: '',
     controles_existentes: '',
     controles_adicionales: '',
@@ -63,16 +62,11 @@ export default function RiesgosPage() {
     fecha_evaluacion_eficacia: '',
     evaluado_por: '',
     eficacia_acciones: '',
-    nivel_riesgo_residual: 0,
-    riesgo_materializado: false,
-    fecha_materializacion: '',
-    descripcion_materializacion: '',
-    impacto_real: '',
-    acciones_contingencia: ''
+    nivel_riesgo_residual: 0
   });
 
   useEffect(() => {
-    fetchRiesgos();
+    fetchOportunidades();
   }, []);
 
   useEffect(() => {
@@ -89,19 +83,19 @@ export default function RiesgosPage() {
     }));
   }, [formData.probabilidad, formData.impacto]);
 
-  const fetchRiesgos = async () => {
+  const fetchOportunidades = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('riesgos_oportunidades')
         .select('*')
-        .eq('tipo', 'riesgo')
+        .eq('tipo', 'oportunidad')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRiesgos(data || []);
+      setOportunidades(data || []);
     } catch (error) {
-      console.error('Error fetching riesgos:', error);
+      console.error('Error fetching oportunidades:', error);
     } finally {
       setLoading(false);
     }
@@ -112,12 +106,11 @@ export default function RiesgosPage() {
     try {
       const dataToSave = {
         ...formData,
-        tipo: 'riesgo',
+        tipo: 'oportunidad',
         partes_interesadas: formData.partes_interesadas.split(',').map(s => s.trim()).filter(Boolean),
         fecha_implementacion: formData.fecha_implementacion || null,
         fecha_ultima_revision: formData.fecha_ultima_revision || null,
         fecha_evaluacion_eficacia: formData.fecha_evaluacion_eficacia || null,
-        fecha_materializacion: formData.fecha_materializacion || null,
         costo_estimado: Number(formData.costo_estimado),
         nivel_riesgo_residual: Number(formData.nivel_riesgo_residual)
       };
@@ -134,62 +127,57 @@ export default function RiesgosPage() {
           .insert([dataToSave]);
         if (error) throw error;
       }
-      fetchRiesgos();
+      fetchOportunidades();
       resetForm();
     } catch (error) {
-      console.error('Error saving riesgo:', error);
-      alert('Error al guardar el riesgo');
+      console.error('Error saving oportunidad:', error);
+      alert('Error al guardar la oportunidad');
     }
   };
 
-  const handleEdit = (riesgo: any) => {
-    setEditingId(riesgo.id);
+  const handleEdit = (oportunidad: any) => {
+    setEditingId(oportunidad.id);
     setFormData({
-      codigo: riesgo.codigo || '',
-      fecha_identificacion: riesgo.fecha_identificacion || new Date().toISOString().split('T')[0],
-      tipo: 'riesgo',
-      categoria: riesgo.categoria || 'operacional',
-      origen: riesgo.origen || '',
-      descripcion: riesgo.descripcion || '',
-      causa_origen: riesgo.causa_origen || '',
-      proceso_relacionado: riesgo.proceso_relacionado || '',
-      contexto: riesgo.contexto || '',
-      probabilidad: riesgo.probabilidad || 1,
-      impacto: riesgo.impacto || 1,
-      nivel_riesgo: riesgo.nivel_riesgo || 1,
-      clasificacion_nivel: riesgo.clasificacion_nivel || 'bajo',
-      partes_interesadas: Array.isArray(riesgo.partes_interesadas) ? riesgo.partes_interesadas.join(', ') : '',
-      estrategia: riesgo.estrategia || 'reducir',
-      acciones_planificadas: riesgo.acciones_planificadas || '',
-      controles_existentes: riesgo.controles_existentes || '',
-      controles_adicionales: riesgo.controles_adicionales || '',
-      responsable: riesgo.responsable || '',
-      area_responsable: riesgo.area_responsable || '',
-      recursos_necesarios: riesgo.recursos_necesarios || '',
-      costo_estimado: riesgo.costo_estimado || 0,
-      fecha_implementacion: riesgo.fecha_implementacion || '',
-      plazo_implementacion: riesgo.plazo_implementacion || '',
-      indicadores_seguimiento: riesgo.indicadores_seguimiento || '',
-      frecuencia_revision: riesgo.frecuencia_revision || 'mensual',
-      fecha_ultima_revision: riesgo.fecha_ultima_revision || '',
-      estado_implementacion: riesgo.estado_implementacion || 'identificado',
-      fecha_evaluacion_eficacia: riesgo.fecha_evaluacion_eficacia || '',
-      evaluado_por: riesgo.evaluado_por || '',
-      eficacia_acciones: riesgo.eficacia_acciones || '',
-      nivel_riesgo_residual: riesgo.nivel_riesgo_residual || 0,
-      riesgo_materializado: riesgo.riesgo_materializado || false,
-      fecha_materializacion: riesgo.fecha_materializacion || '',
-      descripcion_materializacion: riesgo.descripcion_materializacion || '',
-      impacto_real: riesgo.impacto_real || '',
-      acciones_contingencia: riesgo.acciones_contingencia || ''
+      codigo: oportunidad.codigo || '',
+      fecha_identificacion: oportunidad.fecha_identificacion || new Date().toISOString().split('T')[0],
+      tipo: 'oportunidad',
+      categoria: oportunidad.categoria || 'estrategico',
+      origen: oportunidad.origen || '',
+      descripcion: oportunidad.descripcion || '',
+      causa_origen: oportunidad.causa_origen || '',
+      proceso_relacionado: oportunidad.proceso_relacionado || '',
+      contexto: oportunidad.contexto || '',
+      probabilidad: oportunidad.probabilidad || 1,
+      impacto: oportunidad.impacto || 1,
+      nivel_riesgo: oportunidad.nivel_riesgo || 1,
+      clasificacion_nivel: oportunidad.clasificacion_nivel || 'bajo',
+      partes_interesadas: Array.isArray(oportunidad.partes_interesadas) ? oportunidad.partes_interesadas.join(', ') : '',
+      estrategia: oportunidad.estrategia || 'explotar',
+      acciones_planificadas: oportunidad.acciones_planificadas || '',
+      controles_existentes: oportunidad.controles_existentes || '',
+      controles_adicionales: oportunidad.controles_adicionales || '',
+      responsable: oportunidad.responsable || '',
+      area_responsable: oportunidad.area_responsable || '',
+      recursos_necesarios: oportunidad.recursos_necesarios || '',
+      costo_estimado: oportunidad.costo_estimado || 0,
+      fecha_implementacion: oportunidad.fecha_implementacion || '',
+      plazo_implementacion: oportunidad.plazo_implementacion || '',
+      indicadores_seguimiento: oportunidad.indicadores_seguimiento || '',
+      frecuencia_revision: oportunidad.frecuencia_revision || 'mensual',
+      fecha_ultima_revision: oportunidad.fecha_ultima_revision || '',
+      estado_implementacion: oportunidad.estado_implementacion || 'identificado',
+      fecha_evaluacion_eficacia: oportunidad.fecha_evaluacion_eficacia || '',
+      evaluado_por: oportunidad.evaluado_por || '',
+      eficacia_acciones: oportunidad.eficacia_acciones || '',
+      nivel_riesgo_residual: oportunidad.nivel_riesgo_residual || 0
     });
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('¿Eliminar riesgo?')) {
+    if (confirm('¿Eliminar oportunidad?')) {
       const { error } = await supabase.from('riesgos_oportunidades').delete().eq('id', id);
-      if (!error) fetchRiesgos();
+      if (!error) fetchOportunidades();
     }
   };
 
@@ -197,8 +185,8 @@ export default function RiesgosPage() {
     setFormData({
       codigo: '',
       fecha_identificacion: new Date().toISOString().split('T')[0],
-      tipo: 'riesgo',
-      categoria: 'operacional',
+      tipo: 'oportunidad',
+      categoria: 'estrategico',
       origen: '',
       descripcion: '',
       causa_origen: '',
@@ -209,7 +197,7 @@ export default function RiesgosPage() {
       nivel_riesgo: 1,
       clasificacion_nivel: 'bajo',
       partes_interesadas: '',
-      estrategia: 'reducir',
+      estrategia: 'explotar',
       acciones_planificadas: '',
       controles_existentes: '',
       controles_adicionales: '',
@@ -226,12 +214,7 @@ export default function RiesgosPage() {
       fecha_evaluacion_eficacia: '',
       evaluado_por: '',
       eficacia_acciones: '',
-      nivel_riesgo_residual: 0,
-      riesgo_materializado: false,
-      fecha_materializacion: '',
-      descripcion_materializacion: '',
-      impacto_real: '',
-      acciones_contingencia: ''
+      nivel_riesgo_residual: 0
     });
     setEditingId(null);
     setShowForm(false);
@@ -245,16 +228,16 @@ export default function RiesgosPage() {
             <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Gestión de Riesgos</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Gestión de Oportunidades</h1>
           </div>
-          <p className="text-slate-500 ml-7">Identificación y tratamiento de riesgos (6.1)</p>
+          <p className="text-slate-500 ml-7">Identificación y aprovechamiento de oportunidades (6.1)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
           className="btn-primary flex items-center gap-2"
         >
           <Plus size={20} />
-          Nuevo Riesgo
+          Nueva Oportunidad
         </button>
       </div>
 
@@ -263,50 +246,50 @@ export default function RiesgosPage() {
         <div className="card p-4 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Total Riesgos</p>
-              <p className="text-2xl font-bold text-slate-800">{riesgos.length}</p>
+              <p className="text-sm font-medium text-slate-500">Total Oportunidades</p>
+              <p className="text-2xl font-bold text-slate-800">{oportunidades.length}</p>
             </div>
             <div className="p-3 bg-blue-50 rounded-lg">
-              <ShieldAlert className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-        <div className="card p-4 border-l-4 border-red-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Críticos</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {riesgos.filter(r => r.clasificacion_nivel === 'critico').length}
-              </p>
-            </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <AlertTriangle className="text-red-600" size={24} />
-            </div>
-          </div>
-        </div>
-        <div className="card p-4 border-l-4 border-amber-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Altos</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {riesgos.filter(r => r.clasificacion_nivel === 'alto').length}
-              </p>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <Activity className="text-amber-600" size={24} />
+              <Lightbulb className="text-blue-600" size={24} />
             </div>
           </div>
         </div>
         <div className="card p-4 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Controlados</p>
+              <p className="text-sm font-medium text-slate-500">Alto Potencial</p>
               <p className="text-2xl font-bold text-slate-800">
-                {riesgos.filter(r => r.estado_implementacion === 'implementado').length}
+                {oportunidades.filter(o => o.clasificacion_nivel === 'critico' || o.clasificacion_nivel === 'alto').length}
               </p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-lg">
-              <CheckCircle2 className="text-emerald-600" size={24} />
+              <TrendingUp className="text-emerald-600" size={24} />
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 border-l-4 border-amber-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">En Implementación</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {oportunidades.filter(o => o.estado_implementacion === 'en_implementacion').length}
+              </p>
+            </div>
+            <div className="p-3 bg-amber-50 rounded-lg">
+              <Zap className="text-amber-600" size={24} />
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Aprovechadas</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {oportunidades.filter(o => o.estado_implementacion === 'implementado').length}
+              </p>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <CheckCircle2 className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
@@ -315,12 +298,12 @@ export default function RiesgosPage() {
       {/* Main Content */}
       <div className="card">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold text-slate-800">Matriz de Riesgos</h3>
+          <h3 className="font-bold text-slate-800">Matriz de Oportunidades</h3>
           <div className="relative max-w-md w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar riesgo..."
+              placeholder="Buscar oportunidad..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -330,12 +313,12 @@ export default function RiesgosPage() {
           <div className="p-12 text-center text-slate-500">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="animate-spin" size={24} />
-              Cargando riesgos...
+              Cargando oportunidades...
             </div>
           </div>
-        ) : riesgos.length === 0 ? (
+        ) : oportunidades.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            No hay riesgos registrados
+            No hay oportunidades registradas
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -343,57 +326,57 @@ export default function RiesgosPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Código</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Riesgo</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Nivel</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Oportunidad</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Potencial</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estrategia</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                   <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {riesgos.map((riesgo) => (
-                  <tr key={riesgo.id} className="hover:bg-slate-50 transition-colors">
+                {oportunidades.map((oportunidad) => (
+                  <tr key={oportunidad.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-slate-900">{riesgo.codigo}</span>
+                      <span className="text-sm font-medium text-slate-900">{oportunidad.codigo}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-sm text-slate-900 font-medium">{riesgo.descripcion}</span>
-                        <span className="text-xs text-slate-500">{riesgo.categoria}</span>
+                        <span className="text-sm text-slate-900 font-medium">{oportunidad.descripcion}</span>
+                        <span className="text-xs text-slate-500">{oportunidad.categoria}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        riesgo.clasificacion_nivel === 'critico' ? 'bg-red-100 text-red-700' :
-                        riesgo.clasificacion_nivel === 'alto' ? 'bg-orange-100 text-orange-700' :
-                        riesgo.clasificacion_nivel === 'medio' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-green-100 text-green-700'
+                        oportunidad.clasificacion_nivel === 'critico' ? 'bg-emerald-100 text-emerald-700' :
+                        oportunidad.clasificacion_nivel === 'alto' ? 'bg-green-100 text-green-700' :
+                        oportunidad.clasificacion_nivel === 'medio' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-700'
                       }`}>
-                        {riesgo.clasificacion_nivel?.toUpperCase()} ({riesgo.nivel_riesgo})
+                        {oportunidad.clasificacion_nivel?.toUpperCase()} ({oportunidad.nivel_riesgo})
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-slate-700 capitalize">{riesgo.estrategia}</span>
+                      <span className="text-sm text-slate-700 capitalize">{oportunidad.estrategia}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        riesgo.estado_implementacion === 'implementado' ? 'bg-emerald-100 text-emerald-700' :
-                        riesgo.estado_implementacion === 'en_implementacion' ? 'bg-blue-100 text-blue-700' :
+                        oportunidad.estado_implementacion === 'implementado' ? 'bg-emerald-100 text-emerald-700' :
+                        oportunidad.estado_implementacion === 'en_implementacion' ? 'bg-blue-100 text-blue-700' :
                         'bg-slate-100 text-slate-700'
                       }`}>
-                        {riesgo.estado_implementacion?.replace(/_/g, ' ')}
+                        {oportunidad.estado_implementacion?.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex justify-end gap-2">
                         <button 
-                          onClick={() => handleEdit(riesgo)}
+                          onClick={() => handleEdit(oportunidad)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <Edit size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(riesgo.id)}
+                          onClick={() => handleDelete(oportunidad.id)}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 size={18} />
@@ -414,7 +397,7 @@ export default function RiesgosPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? 'Editar Riesgo' : 'Nuevo Riesgo'}
+                {editingId ? 'Editar Oportunidad' : 'Nueva Oportunidad'}
               </h2>
               <button 
                 onClick={resetForm}
@@ -474,7 +457,7 @@ export default function RiesgosPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción del Riesgo</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Descripción de la Oportunidad</label>
                 <textarea
                   value={formData.descripcion}
                   onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
@@ -510,12 +493,12 @@ export default function RiesgosPage() {
 
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-700">Nivel de Riesgo:</span>
+                  <span className="font-medium text-slate-700">Potencial de Oportunidad:</span>
                   <span className={`px-3 py-1 rounded-full font-bold ${
-                    formData.clasificacion_nivel === 'critico' ? 'bg-red-100 text-red-700' :
-                    formData.clasificacion_nivel === 'alto' ? 'bg-orange-100 text-orange-700' :
-                    formData.clasificacion_nivel === 'medio' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
+                    formData.clasificacion_nivel === 'critico' ? 'bg-emerald-100 text-emerald-700' :
+                    formData.clasificacion_nivel === 'alto' ? 'bg-green-100 text-green-700' :
+                    formData.clasificacion_nivel === 'medio' ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-700'
                   }`}>
                     {formData.nivel_riesgo} - {formData.clasificacion_nivel.toUpperCase()}
                   </span>
@@ -530,9 +513,9 @@ export default function RiesgosPage() {
                     onChange={(e) => setFormData({...formData, estrategia: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
-                    <option value="evitar">Evitar</option>
-                    <option value="reducir">Reducir</option>
-                    <option value="transferir">Transferir</option>
+                    <option value="explotar">Explotar</option>
+                    <option value="mejorar">Mejorar</option>
+                    <option value="compartir">Compartir</option>
                     <option value="aceptar">Aceptar</option>
                   </select>
                 </div>

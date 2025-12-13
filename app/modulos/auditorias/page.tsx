@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Auditoria } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import {
@@ -22,17 +21,19 @@ import {
   ArrowLeft,
   Calendar,
   User,
-  Briefcase
+  Briefcase,
+  Target,
+  ListChecks
 } from 'lucide-react';
 
 export default function AuditoriasPage() {
-  const [auditorias, setAuditorias] = useState<Auditoria[]>([]);
+  const [auditorias, setAuditorias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editando, setEditando] = useState<Auditoria | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
-    fecha_auditoria: '',
+    fecha_auditoria: new Date().toISOString().split('T')[0],
     tipo: 'interna',
     proceso_auditado: '',
     auditor_lider: '',
@@ -66,63 +67,65 @@ export default function AuditoriasPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editando) {
-      const { error } = await supabase
-        .from('auditorias')
-        .update(formData)
-        .eq('id', editando.id);
-      
-      if (!error) {
-        fetchAuditorias();
-        resetForm();
+    const dataToSave = {
+      ...formData,
+      hallazgos_totales: Number(formData.hallazgos_totales),
+      conformidades: Number(formData.conformidades),
+      no_conformidades_mayores: Number(formData.no_conformidades_mayores),
+      no_conformidades_menores: Number(formData.no_conformidades_menores),
+      observaciones_count: Number(formData.observaciones_count)
+    };
+
+    try {
+      if (editingId) {
+        const { error } = await supabase
+          .from('auditorias')
+          .update(dataToSave)
+          .eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('auditorias')
+          .insert([dataToSave]);
+        if (error) throw error;
       }
-    } else {
-      const { error } = await supabase
-        .from('auditorias')
-        .insert([formData]);
-      
-      if (!error) {
-        fetchAuditorias();
-        resetForm();
-      }
+      fetchAuditorias();
+      resetForm();
+    } catch (error) {
+      console.error('Error saving auditoria:', error);
+      alert('Error al guardar la auditoría');
     }
   };
 
-  const handleEdit = (auditoria: Auditoria) => {
-    setEditando(auditoria);
+  const handleEdit = (auditoria: any) => {
+    setEditingId(auditoria.id);
     setFormData({
-      fecha_auditoria: auditoria.fecha_auditoria,
-      tipo: auditoria.tipo,
-      proceso_auditado: auditoria.proceso_auditado,
-      auditor_lider: auditoria.auditor_lider,
-      hallazgos_totales: auditoria.hallazgos_totales,
-      conformidades: auditoria.conformidades,
-      no_conformidades_mayores: auditoria.no_conformidades_mayores,
-      no_conformidades_menores: auditoria.no_conformidades_menores,
-      observaciones_count: auditoria.observaciones_count,
-      estado_general: auditoria.estado_general,
-      resumen: auditoria.resumen,
+      fecha_auditoria: auditoria.fecha_auditoria || new Date().toISOString().split('T')[0],
+      tipo: auditoria.tipo || 'interna',
+      proceso_auditado: auditoria.proceso_auditado || '',
+      auditor_lider: auditoria.auditor_lider || '',
+      hallazgos_totales: auditoria.hallazgos_totales || 0,
+      conformidades: auditoria.conformidades || 0,
+      no_conformidades_mayores: auditoria.no_conformidades_mayores || 0,
+      no_conformidades_menores: auditoria.no_conformidades_menores || 0,
+      observaciones_count: auditoria.observaciones_count || 0,
+      estado_general: auditoria.estado_general || 'satisfactorio',
+      resumen: auditoria.resumen || '',
       archivo_informe: auditoria.archivo_informe || ''
     });
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('¿Estás seguro de eliminar esta auditoría?')) {
-      const { error } = await supabase
-        .from('auditorias')
-        .delete()
-        .eq('id', id);
-      
-      if (!error) {
-        fetchAuditorias();
-      }
+    if (confirm('¿Eliminar este registro?')) {
+      const { error } = await supabase.from('auditorias').delete().eq('id', id);
+      if (!error) fetchAuditorias();
     }
   };
 
   const resetForm = () => {
     setFormData({
-      fecha_auditoria: '',
+      fecha_auditoria: new Date().toISOString().split('T')[0],
       tipo: 'interna',
       proceso_auditado: '',
       auditor_lider: '',
@@ -135,7 +138,7 @@ export default function AuditoriasPage() {
       resumen: '',
       archivo_informe: ''
     });
-    setEditando(null);
+    setEditingId(null);
     setShowForm(false);
   };
 
@@ -147,9 +150,9 @@ export default function AuditoriasPage() {
             <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Gestión de Auditorías</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Auditorías</h1>
           </div>
-          <p className="text-slate-500 ml-7">Registro y seguimiento de auditorías internas y externas</p>
+          <p className="text-slate-500 ml-7">Gestión de auditorías internas y externas (9.2)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -173,6 +176,19 @@ export default function AuditoriasPage() {
             </div>
           </div>
         </div>
+        <div className="card p-4 border-l-4 border-rose-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">NC Mayores</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {auditorias.reduce((acc, curr) => acc + (curr.no_conformidades_mayores || 0), 0)}
+              </p>
+            </div>
+            <div className="p-3 bg-rose-50 rounded-lg">
+              <AlertTriangle className="text-rose-600" size={24} />
+            </div>
+          </div>
+        </div>
         <div className="card p-4 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between">
             <div>
@@ -186,29 +202,16 @@ export default function AuditoriasPage() {
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-amber-500">
+        <div className="card p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Con Mejoras</p>
+              <p className="text-sm font-medium text-slate-500">Hallazgos Totales</p>
               <p className="text-2xl font-bold text-slate-800">
-                {auditorias.filter(a => a.estado_general === 'requiere_mejoras').length}
+                {auditorias.reduce((acc, curr) => acc + (curr.hallazgos_totales || 0), 0)}
               </p>
             </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <AlertTriangle className="text-amber-600" size={24} />
-            </div>
-          </div>
-        </div>
-        <div className="card p-4 border-l-4 border-red-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Críticas</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {auditorias.filter(a => a.estado_general === 'critico').length}
-              </p>
-            </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <AlertTriangle className="text-red-600" size={24} />
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <ListChecks className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
@@ -217,101 +220,102 @@ export default function AuditoriasPage() {
       {/* Main Content */}
       <div className="card">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold text-slate-800">Auditorías Registradas</h3>
+          <h3 className="font-bold text-slate-800">Registro de Auditorías</h3>
           <div className="relative max-w-md w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar auditoría..."
+              placeholder="Buscar..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="table-standard">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Proceso</th>
-                <th>Auditor</th>
-                <th>Hallazgos</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        {loading ? (
+          <div className="p-12 text-center text-slate-500">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="animate-spin" size={24} />
+              Cargando datos...
+            </div>
+          </div>
+        ) : auditorias.length === 0 ? (
+          <div className="p-12 text-center text-slate-500">
+            No hay registros
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="animate-spin" size={20} />
-                      Cargando auditorías...
-                    </div>
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Proceso</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Auditor Líder</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
-              ) : auditorias.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-500">
-                    No hay auditorías registradas
-                  </td>
-                </tr>
-              ) : (
-                auditorias.map((auditoria) => (
-                  <tr key={auditoria.id} className="hover:bg-slate-50">
-                    <td className="text-slate-600">
-                      {new Date(auditoria.fecha_auditoria).toLocaleDateString('es-ES')}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {auditorias.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-slate-700">{item.fecha_auditoria}</span>
                     </td>
-                    <td>
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                        {auditoria.tipo.charAt(0).toUpperCase() + auditoria.tipo.slice(1)}
-                      </span>
-                    </td>
-                    <td className="font-medium text-slate-800">{auditoria.proceso_auditado}</td>
-                    <td className="text-slate-600">{auditoria.auditor_lider}</td>
-                    <td className="text-slate-600">{auditoria.hallazgos_totales}</td>
-                    <td>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                        auditoria.estado_general === 'satisfactorio' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                        auditoria.estado_general === 'requiere_mejoras' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                        'bg-red-100 text-red-700 border-red-200'
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold capitalize ${
+                        item.tipo === 'interna' ? 'bg-blue-100 text-blue-700' :
+                        item.tipo === 'externa' ? 'bg-purple-100 text-purple-700' :
+                        'bg-orange-100 text-orange-700'
                       }`}>
-                        {auditoria.estado_general === 'satisfactorio' ? 'Satisfactorio' :
-                         auditoria.estado_general === 'requiere_mejoras' ? 'Requiere Mejoras' : 'Crítico'}
+                        {item.tipo}
                       </span>
                     </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(auditoria)}
-                          className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-medium text-slate-900">{item.proceso_auditado}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-600">{item.auditor_lider}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        item.estado_general === 'satisfactorio' ? 'bg-emerald-100 text-emerald-700' :
+                        item.estado_general === 'requiere_mejoras' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {item.estado_general?.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <Edit size={18} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(auditoria.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 size={18} />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-slate-800">
-                {editando ? 'Editar Auditoría' : 'Nueva Auditoría'}
+                {editingId ? 'Editar Auditoría' : 'Nueva Auditoría'}
               </h2>
               <button 
                 onClick={resetForm}
@@ -322,25 +326,19 @@ export default function AuditoriasPage() {
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Auditoría *</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="date"
-                      required
-                      value={formData.fecha_auditoria}
-                      onChange={(e) => setFormData({...formData, fecha_auditoria: e.target.value})}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Auditoría</label>
+                  <input
+                    type="date"
+                    value={formData.fecha_auditoria}
+                    onChange={(e) => setFormData({...formData, fecha_auditoria: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Auditoría *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
                   <select
-                    required
                     value={formData.tipo}
                     onChange={(e) => setFormData({...formData, tipo: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -350,46 +348,36 @@ export default function AuditoriasPage() {
                     <option value="certificacion">Certificación</option>
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Proceso Auditado *</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="text"
-                      required
-                      value={formData.proceso_auditado}
-                      onChange={(e) => setFormData({...formData, proceso_auditado: e.target.value})}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                      placeholder="Ej. Producción, Ventas"
-                    />
-                  </div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Proceso Auditado</label>
+                  <input
+                    type="text"
+                    value={formData.proceso_auditado}
+                    onChange={(e) => setFormData({...formData, proceso_auditado: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Auditor Líder *</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="text"
-                      required
-                      value={formData.auditor_lider}
-                      onChange={(e) => setFormData({...formData, auditor_lider: e.target.value})}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                      placeholder="Nombre del auditor"
-                    />
-                  </div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Auditor Líder</label>
+                  <input
+                    type="text"
+                    value={formData.auditor_lider}
+                    onChange={(e) => setFormData({...formData, auditor_lider: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Hallazgos Totales</label>
                   <input
                     type="number"
-                    min="0"
                     value={formData.hallazgos_totales}
-                    onChange={(e) => setFormData({...formData, hallazgos_totales: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({...formData, hallazgos_totales: Number(e.target.value)})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
@@ -397,22 +385,29 @@ export default function AuditoriasPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Conformidades</label>
                   <input
                     type="number"
-                    min="0"
                     value={formData.conformidades}
-                    onChange={(e) => setFormData({...formData, conformidades: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({...formData, conformidades: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones (Cant.)</label>
+                  <input
+                    type="number"
+                    value={formData.observaciones_count}
+                    onChange={(e) => setFormData({...formData, observaciones_count: Number(e.target.value)})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">NC Mayores</label>
                   <input
                     type="number"
-                    min="0"
                     value={formData.no_conformidades_mayores}
-                    onChange={(e) => setFormData({...formData, no_conformidades_mayores: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({...formData, no_conformidades_mayores: Number(e.target.value)})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
@@ -420,18 +415,26 @@ export default function AuditoriasPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">NC Menores</label>
                   <input
                     type="number"
-                    min="0"
                     value={formData.no_conformidades_menores}
-                    onChange={(e) => setFormData({...formData, no_conformidades_menores: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({...formData, no_conformidades_menores: Number(e.target.value)})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Estado General *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Resumen</label>
+                <textarea
+                  value={formData.resumen}
+                  onChange={(e) => setFormData({...formData, resumen: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Estado General</label>
                 <select
-                  required
                   value={formData.estado_general}
                   onChange={(e) => setFormData({...formData, estado_general: e.target.value})}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -443,14 +446,12 @@ export default function AuditoriasPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Resumen *</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={formData.resumen}
-                  onChange={(e) => setFormData({...formData, resumen: e.target.value})}
+                <label className="block text-sm font-medium text-slate-700 mb-1">URL Informe</label>
+                <input
+                  type="text"
+                  value={formData.archivo_informe}
+                  onChange={(e) => setFormData({...formData, archivo_informe: e.target.value})}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  placeholder="Resumen de los resultados de la auditoría..."
                 />
               </div>
 
@@ -467,7 +468,7 @@ export default function AuditoriasPage() {
                   className="btn-primary flex items-center gap-2"
                 >
                   <Save size={18} />
-                  {editando ? 'Actualizar Auditoría' : 'Guardar Auditoría'}
+                  {editingId ? 'Actualizar' : 'Guardar'}
                 </button>
               </div>
             </form>

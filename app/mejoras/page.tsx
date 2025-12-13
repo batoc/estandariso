@@ -21,7 +21,9 @@ import {
   ArrowLeft,
   Target,
   Zap,
-  Rocket
+  Rocket,
+  DollarSign,
+  FileText
 } from 'lucide-react';
 
 export default function MejorasPage() {
@@ -31,26 +33,36 @@ export default function MejorasPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
-    codigo_om: '',
     fecha_identificacion: new Date().toISOString().split('T')[0],
-    origen: 'iniciativa_propia',
     titulo: '',
     descripcion_situacion_actual: '',
     descripcion_mejora_propuesta: '',
+    origen: 'iniciativa_propia',
     proceso_afectado: '',
-    area_responsable: '',
     beneficios_esperados: '',
-    impacto_esperado: 'medio',
     prioridad: 'media',
+    estado: 'propuesta',
     responsable_implementacion: '',
-    estado: 'propuesta'
+    plan_implementacion: '',
+    fecha_inicio_prevista: '',
+    fecha_fin_prevista: '',
+    recursos_necesarios: '',
+    costo_estimado: 0,
+    resultados_obtenidos: '',
+    eficaz: false
   });
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-  async function cargar() {
+  async function cargarDatos() {
     try {
-      const { data, error } = await supabase.from('oportunidades_mejora').select('*').order('fecha_identificacion', { ascending: false });
+      const { data, error } = await supabase
+        .from('oportunidades_mejora')
+        .select('*')
+        .order('fecha_identificacion', { ascending: false });
+
       if (error) throw error;
       setMejoras(data || []);
     } catch (error) {
@@ -63,87 +75,82 @@ export default function MejorasPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
+      const dataToSave = {
+        ...formData,
+        costo_estimado: Number(formData.costo_estimado),
+        fecha_inicio_prevista: formData.fecha_inicio_prevista || null,
+        fecha_fin_prevista: formData.fecha_fin_prevista || null
+      };
+
       if (editingId) {
-        const { error } = await supabase.from('oportunidades_mejora').update(formData).eq('id', editingId);
+        const { error } = await supabase.from('oportunidades_mejora').update(dataToSave).eq('id', editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('oportunidades_mejora').insert([formData]);
+        const { error } = await supabase.from('oportunidades_mejora').insert([dataToSave]);
         if (error) throw error;
       }
-      await cargar();
+      
+      cargarDatos();
       resetForm();
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al guardar');
+      alert('Error al guardar la mejora');
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('¿Eliminar oportunidad de mejora?')) return;
-    try {
-      const { error } = await supabase.from('oportunidades_mejora').delete().eq('id', id);
-      if (error) throw error;
-      await cargar();
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  }
-
-  function handleEdit(m: any) {
+  const handleEdit = (mejora: any) => {
+    setEditingId(mejora.id);
     setFormData({
-      codigo_om: m.codigo_om || '',
-      fecha_identificacion: m.fecha_identificacion,
-      origen: m.origen || 'iniciativa_propia',
-      titulo: m.titulo,
-      descripcion_situacion_actual: m.descripcion_situacion_actual,
-      descripcion_mejora_propuesta: m.descripcion_mejora_propuesta,
-      proceso_afectado: m.proceso_afectado || '',
-      area_responsable: m.area_responsable || '',
-      beneficios_esperados: m.beneficios_esperados || '',
-      impacto_esperado: m.impacto_esperado || 'medio',
-      prioridad: m.prioridad || 'media',
-      responsable_implementacion: m.responsable_implementacion || '',
-      estado: m.estado
+      fecha_identificacion: mejora.fecha_identificacion || new Date().toISOString().split('T')[0],
+      titulo: mejora.titulo || '',
+      descripcion_situacion_actual: mejora.descripcion_situacion_actual || '',
+      descripcion_mejora_propuesta: mejora.descripcion_mejora_propuesta || '',
+      origen: mejora.origen || 'iniciativa_propia',
+      proceso_afectado: mejora.proceso_afectado || '',
+      beneficios_esperados: mejora.beneficios_esperados || '',
+      prioridad: mejora.prioridad || 'media',
+      estado: mejora.estado || 'propuesta',
+      responsable_implementacion: mejora.responsable_implementacion || '',
+      plan_implementacion: mejora.plan_implementacion || '',
+      fecha_inicio_prevista: mejora.fecha_inicio_prevista || '',
+      fecha_fin_prevista: mejora.fecha_fin_prevista || '',
+      recursos_necesarios: mejora.recursos_necesarios || '',
+      costo_estimado: mejora.costo_estimado || 0,
+      resultados_obtenidos: mejora.resultados_obtenidos || '',
+      eficaz: mejora.eficaz || false
     });
-    setEditingId(m.id);
     setShowForm(true);
-  }
+  };
 
-  function resetForm() {
-    setFormData({
-      codigo_om: '',
-      fecha_identificacion: new Date().toISOString().split('T')[0],
-      origen: 'iniciativa_propia',
-      titulo: '',
-      descripcion_situacion_actual: '',
-      descripcion_mejora_propuesta: '',
-      proceso_afectado: '',
-      area_responsable: '',
-      beneficios_esperados: '',
-      impacto_esperado: 'medio',
-      prioridad: 'media',
-      responsable_implementacion: '',
-      estado: 'propuesta'
-    });
-    setEditingId(null);
-    setShowForm(false);
-  }
-
-  const getImpactoColor = (impacto: string) => {
-    switch (impacto) {
-      case 'alto': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'medio': return 'text-blue-600 bg-blue-50 border-blue-100';
-      default: return 'text-slate-600 bg-slate-50 border-slate-100';
+  const handleDelete = async (id: number) => {
+    if (confirm('¿Eliminar esta oportunidad de mejora?')) {
+      const { error } = await supabase.from('oportunidades_mejora').delete().eq('id', id);
+      if (!error) cargarDatos();
     }
   };
 
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'implementada': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'en_proceso': return 'text-blue-600 bg-blue-50 border-blue-100';
-      case 'propuesta': return 'text-amber-600 bg-amber-50 border-amber-100';
-      default: return 'text-slate-600 bg-slate-50 border-slate-100';
-    }
+  const resetForm = () => {
+    setFormData({
+      fecha_identificacion: new Date().toISOString().split('T')[0],
+      titulo: '',
+      descripcion_situacion_actual: '',
+      descripcion_mejora_propuesta: '',
+      origen: 'iniciativa_propia',
+      proceso_afectado: '',
+      beneficios_esperados: '',
+      prioridad: 'media',
+      estado: 'propuesta',
+      responsable_implementacion: '',
+      plan_implementacion: '',
+      fecha_inicio_prevista: '',
+      fecha_fin_prevista: '',
+      recursos_necesarios: '',
+      costo_estimado: 0,
+      resultados_obtenidos: '',
+      eficaz: false
+    });
+    setEditingId(null);
+    setShowForm(false);
   };
 
   return (
@@ -156,14 +163,14 @@ export default function MejorasPage() {
             </Link>
             <h1 className="text-2xl font-bold text-slate-800">Oportunidades de Mejora</h1>
           </div>
-          <p className="text-slate-500 ml-7">Gestión de iniciativas para la mejora continua</p>
+          <p className="text-slate-500 ml-7">Gestión de la mejora continua (10.1, 10.3)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
           className="btn-primary flex items-center gap-2"
         >
           <Plus size={20} />
-          Nueva Oportunidad
+          Nueva Mejora
         </button>
       </div>
 
@@ -172,11 +179,24 @@ export default function MejorasPage() {
         <div className="card p-4 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Total Iniciativas</p>
+              <p className="text-sm font-medium text-slate-500">Total Mejoras</p>
               <p className="text-2xl font-bold text-slate-800">{mejoras.length}</p>
             </div>
             <div className="p-3 bg-blue-50 rounded-lg">
               <Lightbulb className="text-blue-600" size={24} />
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 border-l-4 border-amber-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">En Implementación</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {mejoras.filter(m => m.estado === 'en_implementacion').length}
+              </p>
+            </div>
+            <div className="p-3 bg-amber-50 rounded-lg">
+              <Rocket className="text-amber-600" size={24} />
             </div>
           </div>
         </div>
@@ -189,33 +209,20 @@ export default function MejorasPage() {
               </p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-lg">
-              <Rocket className="text-emerald-600" size={24} />
-            </div>
-          </div>
-        </div>
-        <div className="card p-4 border-l-4 border-amber-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Alto Impacto</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {mejoras.filter(m => m.impacto_esperado === 'alto').length}
-              </p>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <Zap className="text-amber-600" size={24} />
+              <CheckCircle2 className="text-emerald-600" size={24} />
             </div>
           </div>
         </div>
         <div className="card p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">En Proceso</p>
+              <p className="text-sm font-medium text-slate-500">Eficaces</p>
               <p className="text-2xl font-bold text-slate-800">
-                {mejoras.filter(m => m.estado === 'en_proceso').length}
+                {mejoras.filter(m => m.eficaz).length}
               </p>
             </div>
             <div className="p-3 bg-purple-50 rounded-lg">
-              <Clock className="text-purple-600" size={24} />
+              <TrendingUp className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
@@ -224,12 +231,12 @@ export default function MejorasPage() {
       {/* Main Content */}
       <div className="card">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-bold text-slate-800">Listado de Oportunidades</h3>
+          <h3 className="font-bold text-slate-800">Registro de Mejoras</h3>
           <div className="relative max-w-md w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar oportunidad..."
+              placeholder="Buscar mejora..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -239,71 +246,81 @@ export default function MejorasPage() {
           <div className="p-12 text-center text-slate-500">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="animate-spin" size={24} />
-              Cargando oportunidades...
+              Cargando mejoras...
             </div>
           </div>
         ) : mejoras.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            No hay oportunidades registradas
+            No hay oportunidades de mejora registradas
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {mejoras.map((mejora) => (
-              <div key={mejora.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white flex flex-col">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${getImpactoColor(mejora.impacto_esperado)} uppercase`}>
-                        Impacto {mejora.impacto_esperado}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Título</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Origen</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Prioridad</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {mejoras.map((mejora) => (
+                  <tr key={mejora.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-slate-700">{mejora.fecha_identificacion}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-slate-900">{mejora.titulo}</span>
+                        <span className="text-xs text-slate-500 line-clamp-1">{mejora.descripcion_mejora_propuesta}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-slate-700 capitalize">{mejora.origen?.replace(/_/g, ' ')}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                        mejora.prioridad === 'critica' ? 'bg-red-100 text-red-700' :
+                        mejora.prioridad === 'alta' ? 'bg-orange-100 text-orange-700' :
+                        mejora.prioridad === 'media' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {mejora.prioridad}
                       </span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${getEstadoColor(mejora.estado)} uppercase`}>
-                        {mejora.estado.replace('_', ' ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        mejora.estado === 'implementada' ? 'bg-emerald-100 text-emerald-700' :
+                        mejora.estado === 'en_implementacion' ? 'bg-blue-100 text-blue-700' :
+                        mejora.estado === 'rechazada' ? 'bg-red-100 text-red-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {mejora.estado?.replace(/_/g, ' ')}
                       </span>
-                    </div>
-                    <h4 className="font-bold text-slate-800 line-clamp-2">{mejora.titulo}</h4>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-4 flex-1">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs font-medium text-slate-500 mb-1">Situación Actual</p>
-                    <p className="text-sm text-slate-600 line-clamp-2">{mejora.descripcion_situacion_actual}</p>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs font-medium text-blue-600 mb-1">Propuesta</p>
-                    <p className="text-sm text-slate-600 line-clamp-2">{mejora.descripcion_mejora_propuesta}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-4 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-1">
-                    <User size={14} />
-                    {mejora.responsable_implementacion || 'Sin asignar'}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    {mejora.fecha_identificacion}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(mejora)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Edit size={16} />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(mejora.id)}
-                    className="flex-1 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={16} />
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleEdit(mejora)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(mejora.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -311,10 +328,10 @@ export default function MejorasPage() {
       {/* Modal Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? 'Editar Oportunidad' : 'Nueva Oportunidad'}
+                {editingId ? 'Editar Mejora' : 'Nueva Oportunidad de Mejora'}
               </h2>
               <button 
                 onClick={resetForm}
@@ -327,29 +344,14 @@ export default function MejorasPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Título *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Identificación</label>
                   <input
-                    type="text"
-                    required
-                    value={formData.titulo}
-                    onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                    type="date"
+                    value={formData.fecha_identificacion}
+                    onChange={(e) => setFormData({...formData, fecha_identificacion: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Título breve de la mejora"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Código OM</label>
-                  <input
-                    type="text"
-                    value={formData.codigo_om}
-                    onChange={(e) => setFormData({...formData, codigo_om: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej. OM-2024-001"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Origen</label>
                   <select
@@ -359,46 +361,42 @@ export default function MejorasPage() {
                   >
                     <option value="iniciativa_propia">Iniciativa Propia</option>
                     <option value="auditoria">Auditoría</option>
-                    <option value="revision_direccion">Revisión Dirección</option>
-                    <option value="queja_cliente">Queja Cliente</option>
-                    <option value="analisis_datos">Análisis de Datos</option>
+                    <option value="revision_direccion">Revisión por Dirección</option>
+                    <option value="sugerencia_personal">Sugerencia Personal</option>
+                    <option value="cliente">Cliente</option>
+                    <option value="benchmarking">Benchmarking</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Identificación *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.fecha_identificacion}
-                    onChange={(e) => setFormData({...formData, fecha_identificacion: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Situación Actual *</label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={formData.descripcion_situacion_actual}
-                    onChange={(e) => setFormData({...formData, descripcion_situacion_actual: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Descripción del problema o situación..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mejora Propuesta *</label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={formData.descripcion_mejora_propuesta}
-                    onChange={(e) => setFormData({...formData, descripcion_mejora_propuesta: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Descripción de la solución..."
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
+                <input
+                  type="text"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Situación Actual</label>
+                <textarea
+                  value={formData.descripcion_situacion_actual}
+                  onChange={(e) => setFormData({...formData, descripcion_situacion_actual: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Mejora Propuesta</label>
+                <textarea
+                  value={formData.descripcion_mejora_propuesta}
+                  onChange={(e) => setFormData({...formData, descripcion_mejora_propuesta: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -412,52 +410,83 @@ export default function MejorasPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Área Responsable</label>
-                  <input
-                    type="text"
-                    value={formData.area_responsable}
-                    onChange={(e) => setFormData({...formData, area_responsable: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Beneficios Esperados</label>
-                <textarea
-                  rows={2}
-                  value={formData.beneficios_esperados}
-                  onChange={(e) => setFormData({...formData, beneficios_esperados: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  placeholder="Resultados esperados..."
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Impacto Esperado</label>
-                  <select
-                    value={formData.impacto_esperado}
-                    onChange={(e) => setFormData({...formData, impacto_esperado: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  >
-                    <option value="alto">Alto</option>
-                    <option value="medio">Medio</option>
-                    <option value="bajo">Bajo</option>
-                  </select>
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Prioridad</label>
                   <select
                     value={formData.prioridad}
                     onChange={(e) => setFormData({...formData, prioridad: e.target.value})}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
-                    <option value="alta">Alta</option>
-                    <option value="media">Media</option>
                     <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                    <option value="critica">Crítica</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Beneficios Esperados</label>
+                <textarea
+                  value={formData.beneficios_esperados}
+                  onChange={(e) => setFormData({...formData, beneficios_esperados: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Responsable Implementación</label>
+                  <input
+                    type="text"
+                    value={formData.responsable_implementacion}
+                    onChange={(e) => setFormData({...formData, responsable_implementacion: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Costo Estimado</label>
+                  <input
+                    type="number"
+                    value={formData.costo_estimado}
+                    onChange={(e) => setFormData({...formData, costo_estimado: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Plan de Implementación</label>
+                <textarea
+                  value={formData.plan_implementacion}
+                  onChange={(e) => setFormData({...formData, plan_implementacion: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Inicio Prevista</label>
+                  <input
+                    type="date"
+                    value={formData.fecha_inicio_prevista}
+                    onChange={(e) => setFormData({...formData, fecha_inicio_prevista: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Fecha Fin Prevista</label>
+                  <input
+                    type="date"
+                    value={formData.fecha_fin_prevista}
+                    onChange={(e) => setFormData({...formData, fecha_fin_prevista: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
                   <select
@@ -466,21 +495,33 @@ export default function MejorasPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   >
                     <option value="propuesta">Propuesta</option>
+                    <option value="en_evaluacion">En Evaluación</option>
                     <option value="aprobada">Aprobada</option>
-                    <option value="en_proceso">En Proceso</option>
-                    <option value="implementada">Implementada</option>
-                    <option value="verificada">Verificada</option>
                     <option value="rechazada">Rechazada</option>
+                    <option value="en_implementacion">En Implementación</option>
+                    <option value="implementada">Implementada</option>
+                    <option value="cancelada">Cancelada</option>
                   </select>
+                </div>
+                <div className="flex items-center pt-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.eficaz}
+                      onChange={(e) => setFormData({...formData, eficaz: e.target.checked})}
+                      className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-slate-700">¿Fue eficaz?</span>
+                  </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Responsable Implementación</label>
-                <input
-                  type="text"
-                  value={formData.responsable_implementacion}
-                  onChange={(e) => setFormData({...formData, responsable_implementacion: e.target.value})}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Resultados Obtenidos</label>
+                <textarea
+                  value={formData.resultados_obtenidos}
+                  onChange={(e) => setFormData({...formData, resultados_obtenidos: e.target.value})}
+                  rows={2}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
               </div>

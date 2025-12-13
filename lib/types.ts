@@ -71,16 +71,26 @@ export interface Compromiso {
   created_at: string;
   updated_at: string;
   
-  // Información del compromiso
+  // Identificación
+  codigo_compromiso?: string;
   tipo_salida: 'mejora' | 'cambio_sgc' | 'recursos';
+  categoria_especifica?: string;
   descripcion: string;
   objetivo?: string;
+  alcance?: string;
+  relacionado_con?: string;
+  origen_entrada?: string;
   
   // Responsabilidad
   responsable: string;
+  cargo_responsable?: string;
   area_responsable?: string;
+  equipo_trabajo?: string[];
   
-  // Plazos
+  // Planificación
+  plan_accion?: string;
+  actividades?: string[];
+  hitos?: string[];
   fecha_compromiso: string;
   fecha_limite: string;
   fecha_cumplimiento?: string;
@@ -89,19 +99,44 @@ export interface Compromiso {
   estado: 'pendiente' | 'en_proceso' | 'completado' | 'vencido' | 'cancelado';
   prioridad: 'alta' | 'media' | 'baja';
   porcentaje_avance: number;
+  fecha_ultimo_seguimiento?: string;
+  reporte_avance?: string;
+  obstaculos_identificados?: string;
+  riesgos_cumplimiento?: string;
+  acciones_mitigacion?: string;
+  criterios_aceptacion?: string;
   
   // Recursos
   recursos_necesarios?: string;
+  recursos_humanos?: string;
+  recursos_tecnicos?: string;
+  recursos_financieros?: string;
   presupuesto_estimado?: number;
+  presupuesto_aprobado?: number;
   
   // Evidencias
   evidencias?: string[];
   observaciones?: string;
   
-  // Verificación
+  // Verificación y Cierre
   verificado_por?: string;
   fecha_verificacion?: string;
+  resultado_verificacion?: string;
   eficaz?: boolean;
+  beneficios_esperados?: string;
+  beneficios_obtenidos?: string;
+  impacto_sgc?: string;
+  
+  // Extensiones
+  requiere_extension?: boolean;
+  justificacion_extension?: string;
+  nueva_fecha_limite?: string;
+  aprobado_extension_por?: string;
+  
+  // Cierre
+  fecha_cierre_real?: string;
+  lecciones_aprendidas?: string;
+  seguimiento_detallado?: string;
 }
 
 export type NuevoCompromiso = Omit<Compromiso, 'id' | 'created_at' | 'updated_at'>;

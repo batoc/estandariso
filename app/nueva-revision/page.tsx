@@ -160,22 +160,23 @@ export default function NuevaRevisionPage() {
           estado: 'abierta',
           
           // Entradas
-          analisis_acciones_previas: formData.analisis_acciones_previas,
+          analisis_compromisos_previos: formData.analisis_acciones_previas,
           analisis_cambios_externos: formData.analisis_cambios_externos,
-          analisis_clientes: formData.analisis_satisfaccion_cliente,
+          analisis_satisfaccion_cliente: formData.analisis_satisfaccion_cliente,
           analisis_objetivos_calidad: formData.analisis_objetivos_calidad,
-          analisis_procesos: `${formData.analisis_conformidad_productos}\n\nAnálisis NC: ${formData.analisis_no_conformidades}`,
+          analisis_conformidad_productos: formData.analisis_conformidad_productos,
+          analisis_no_conformidades: formData.analisis_no_conformidades,
           analisis_auditorias: formData.analisis_auditorias,
           analisis_proveedores: formData.analisis_proveedores,
           analisis_recursos: formData.analisis_recursos,
           analisis_riesgos: formData.analisis_riesgos,
-          analisis_oportunidades: formData.analisis_mejoras,
+          analisis_mejoras: formData.analisis_mejoras,
           
           // Salidas
           conclusiones_generales: formData.conclusiones_generales,
-          decisiones_sgc: formData.decisiones_cambios_sgc,
-          decisiones_productos: formData.decisiones_mejora,
-          necesidades_recursos: formData.decisiones_recursos
+          decisiones_cambios_sgc: formData.decisiones_cambios_sgc,
+          decisiones_mejora: formData.decisiones_mejora,
+          decisiones_recursos: formData.decisiones_recursos
         }])
         .select()
         .single();
