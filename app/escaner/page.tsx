@@ -84,70 +84,83 @@ export default function EscanerPage() {
     try {
       // 1. Identificar inicio de trama válida (PubDSK_1)
       const startIdx = raw.indexOf('PubDSK_1');
-      if (startIdx === -1 && raw.length < 50) return null; // No parece una cédula válida
+      // Si no hay PubDSK_1, intentamos buscar el patrón de Cédula+Apellido directamente
+      // (A veces el header no se lee bien)
+      
+      const workingRaw = startIdx !== -1 ? raw.substring(startIdx) : raw;
+      
+      // 2. Limpiar caracteres de control
+      // Reemplazamos nulos (\0) y otros caracteres no imprimibles por '|'
+      const clean = workingRaw.replace(/[\x00-\x1F\x7F-\x9F]+/g, '|');
+      
+      // 3. Buscar el patrón clave: Cédula (8-10 dígitos) pegada o seguida de Apellido1 (Letras mayúsculas)
+      // Ejemplo: ...|1144086542MARTINEZ|...
+      // Regex: Busca dígitos seguidos inmediatamente de letras, O dígitos seguidos de separador y letras
+      const mainMatch = clean.match(/(\d{7,10})([A-ZÑ]+)/);
+      
+      if (!mainMatch) return null;
 
-      // 2. Limpiar caracteres de control pero mantener estructura
-      // Reemplazamos nulos y otros caracteres de control por un separador único '|'
-      const clean = raw.substring(startIdx === -1 ? 0 : startIdx).replace(/[\x00-\x1F\x7F-\x9F]+/g, '|');
+      const documento = mainMatch[1];
+      const apellido1 = mainMatch[2]; // En este formato, el apellido1 suele venir pegado
       
-      // 3. Extraer Cédula y Apellido 1 (A veces vienen pegados: 1234567890APELLIDO)
-      // Buscamos un número de 7-10 dígitos seguido opcionalmente de letras
-      const idMatch = clean.match(/(\d{7,10})([A-ZÑ]+)?/);
-      
-      if (!idMatch) return null;
-
-      const documento = idMatch[1];
-      let apellido1 = idMatch[2] || '';
-      
-      // 4. Dividir el resto por el separador para encontrar los otros nombres
-      // La estructura suele ser: ...|ID+Ap1|Ap2|Nom1|Nom2|...
-      // O si Ap1 estaba separado: ...|ID|Ap1|Ap2|Nom1|Nom2|...
-      
+      // 4. Buscar el resto de nombres
+      // Dividimos por '|' y buscamos el bloque que contiene "Documento+Apellido1"
       const parts = clean.split('|').filter(p => p.trim().length > 0);
       
-      // Buscamos el índice donde encontramos el documento
-      // Nota: parts[docIndex] podría ser "1234567890APELLIDO" o solo "1234567890"
+      // Encontramos el índice del bloque que contiene la cédula
       const docIndex = parts.findIndex(p => p.includes(documento));
       
       if (docIndex === -1) return { documento, nombre: 'Desconocido' };
 
-      // Recuperar partes siguientes
-      let currentIdx = docIndex;
+      // Los siguientes bloques deberían ser Apellido2, Nombre1, Nombre2
+      // Validamos que sean solo letras y no sean metadatos (que empiezan por números)
       
-      // Si el token actual es SOLO el documento, avanzamos al siguiente para Apellido1
-      // Si el token actual TIENE letras, es porque Apellido1 estaba pegado (ya lo tenemos en apellido1)
-      if (!apellido1 && parts[currentIdx] === documento) {
-        currentIdx++;
-        apellido1 = parts[currentIdx] || '';
-      } else if (!apellido1) {
-         // El documento está dentro de parts[currentIdx] pero no lo capturó el regex anterior (raro)
-         apellido1 = parts[currentIdx].replace(documento, '');
+      let namesFound = [apellido1];
+      
+      // Iteramos los siguientes 3 bloques
+      for (let i = 1; i <= 3; i++) {
+        const part = parts[docIndex + i];
+        if (part && /^[A-ZÑ\s]+$/.test(part) && part.length > 1) {
+          namesFound.push(part);
+        } else {
+          // Si encontramos algo que no es nombre (ej: 0M...), paramos
+          break;
+        }
       }
-
-      // Asumimos orden: Apellido1 -> Apellido2 -> Nombre1 -> Nombre2
-      // Pero debemos tener cuidado con no tomar campos de metadata (que empiezan por números o códigos)
       
-      // Si apellido1 ya lo tenemos (del regex o del paso anterior), el siguiente token es Apellido2
-      // Si apellido1 lo sacamos del regex (estaba pegado), currentIdx sigue siendo docIndex.
-      // El siguiente token (parts[currentIdx + 1]) sería Apellido2.
-      
-      const apellido2 = parts[currentIdx + 1] || '';
-      const nombre1 = parts[currentIdx + 2] || '';
-      const nombre2 = parts[currentIdx + 3] || '';
+      // Reconstruir nombre (Apellido1 Apellido2 Nombre1 Nombre2)
+      // Nota: En la cédula el orden es Ap1 Ap2 Nom1 Nom2
+      const nombreCompleto = namesFound.join(' ').trim();
 
-      // Filtrar basura: Los nombres no suelen tener números ni ser muy cortos (excepto conectores, pero en cédula no suelen ir)
-      // Además, la metadata suele empezar con 0M... o 0F...
+      // 5. Extraer Metadatos (Género, Fecha Nacimiento, RH)
+      // Buscamos patrón: 0M o 0F seguido de fecha YYYYMMDD y luego RH
+      // Ejemplo: ...|0F19960214310010O+|...
+      const metaMatch = clean.match(/(0[MF])(\d{8})\d*([OAB][+-]?)/);
       
-      const rawNames = [apellido1, apellido2, nombre1, nombre2];
-      const validNames = rawNames.filter(n => !n.match(/\d/) && n.length > 1);
-
-      // Extraer Datos Adicionales (Género, RH, Fecha Nacimiento)
-      // Buscamos patrón: (0M|0F)(\d{8}).*(O\+|O-|A\+|A-|B\+|B-|AB\+|AB-)
-      // El regex busca en todo el string limpio
-      const metaMatch = clean.match(/(0[MF])(\d{8})\d{0,15}([OAB][+-]?)/);
       let rh = '';
       let genero = '';
       let fechaNacimiento = '';
+
+      if (metaMatch) {
+        genero = metaMatch[1] === '0M' ? 'Masculino' : 'Femenino';
+        const f = metaMatch[2]; // YYYYMMDD
+        fechaNacimiento = `${f.substring(0,4)}-${f.substring(4,6)}-${f.substring(6,8)}`;
+        rh = metaMatch[3];
+      }
+
+      return { 
+        documento, 
+        nombre: nombreCompleto,
+        rh,
+        genero,
+        fechaNacimiento
+      };
+
+    } catch (e) {
+      console.error("Error parsing ID", e);
+      return null;
+    }
+  };
 
       if (metaMatch) {
         genero = metaMatch[1] === '0M' ? 'Masculino' : 'Femenino';
@@ -244,9 +257,17 @@ export default function EscanerPage() {
         extractedText += '\n--- FRONTAL ---\n' + text;
         
         // Buscar CC en frontal: "NUMERO 1.107.099.984"
-        // A veces OCR lee "NUMERI" o "NUMER0"
-        const frontCC = text.match(/(?:NUMER[O0I])\s*(\d{1,3}[.]?\d{3}[.]?\d{3})/i);
-        if (frontCC) possibleCC = frontCC[1].replace(/\./g, '');
+        // Mejoras: Espacios opcionales entre letras de NUMERO, manejo de errores OCR (0 por O, I por 1, etc)
+        // Regex: Busca algo parecido a "NUMERO" seguido de dígitos con posibles puntos
+        const frontCC = text.match(/(?:N\s*U\s*M\s*E\s*R\s*[O0I])\s*[:.]?\s*(\d{1,3}[.]?\d{3}[.]?\d{3})/i);
+        
+        if (frontCC) {
+          possibleCC = frontCC[1].replace(/\./g, '');
+        } else {
+          // Intento alternativo: Buscar patrón de cédula aislado (ej: 1.144.086.542)
+          const isolatedCC = text.match(/\b(\d{1,3}\.\d{3}\.\d{3})\b/);
+          if (isolatedCC) possibleCC = isolatedCC[1].replace(/\./g, '');
+        }
       }
 
       // Procesar Trasera
@@ -257,21 +278,30 @@ export default function EscanerPage() {
         // Buscar CC en trasera (zona inferior): ...-M-1107099984-...
         // Patrón: Letra - ID - Fecha
         const backCC = text.match(/-[MF]-(\d{7,10})-/);
-        if (backCC) possibleCC = backCC[1];
+        if (backCC && !possibleCC) possibleCC = backCC[1];
 
-        // Buscar Fecha Nacimiento: "15-JUL-1996"
-        const birthMatch = text.match(/(\d{1,2}-[A-Z]{3}-\d{4})/);
-        if (birthMatch) possibleBirth = birthMatch[1];
+        // Buscar Fecha Nacimiento: "15-JUL-1996" o "15 JUL 1996"
+        // A veces el OCR lee espacios en lugar de guiones
+        const birthMatch = text.match(/(\d{1,2})[\s-]([A-Z]{3})[\s-](\d{4})/);
+        if (birthMatch) {
+          possibleBirth = `${birthMatch[1]}-${birthMatch[2]}-${birthMatch[3]}`;
+        }
 
-        // Buscar RH: "RH O+"
-        const rhMatch = text.match(/RH\s*([OAB][+-]?)/i);
+        // Buscar RH: "RH O+" o "RH: O+"
+        const rhMatch = text.match(/RH\s*[:.]?\s*([OAB][+-]?)/i);
         if (rhMatch) possibleRH = rhMatch[1];
       }
 
       // Fallback simple para CC si no se encontró con patrones específicos
+      // Buscamos el número más largo entre 7 y 10 dígitos que no sea una fecha
       if (!possibleCC) {
-        const simpleMatch = extractedText.match(/(\d{8,10})/);
-        if (simpleMatch) possibleCC = simpleMatch[1];
+        const allNumbers = extractedText.match(/\b\d{7,10}\b/g);
+        if (allNumbers) {
+          // Filtramos números que parecen fechas (ej: 19960214) o teléfonos
+          // Asumimos que la cédula es el número más probable en ese rango
+          const candidates = allNumbers.filter(n => !n.startsWith('19') && !n.startsWith('20'));
+          if (candidates.length > 0) possibleCC = candidates[0];
+        }
       }
 
       setOcrResult({
