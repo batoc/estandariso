@@ -7,7 +7,8 @@ Módulo experimental **completamente independiente** del sistema de gestión de 
 ## ✨ Características
 
 - ✅ Escaneo en vivo con acceso a cámara del navegador
-- ✅ Detección de códigos PDF417
+- ✅ Detección optimizada de códigos PDF417 (Modo "Try Harder")
+- ✅ Guía visual (overlay) para ayudar al posicionamiento
 - ✅ Almacenamiento en Supabase (tabla independiente `cedulas_demo`)
 - ✅ Tabla de últimos 5 registros
 - ✅ Copiar datos al portapapeles
@@ -35,10 +36,10 @@ Tabla `cedulas_demo` creada con:
 
 #### 🎥 Página de Escaneo (`/escaner/page.tsx`)
 - Botón "Activar Cámara" → solicita permisos y abre video en vivo
-- Video en vivo con aspecto 4:3
-- Lector PDF417 configurado con `timeBetweenScans: 100ms` para detección rápida
-- Detección automática de códigos
-- Detención automática del video al detectar código
+- Video en vivo con aspecto 4:3 y guía visual
+- Lector PDF417 configurado con `BrowserMultiFormatReader` y hints `TRY_HARDER`
+- Detección automática de códigos usando `decodeFromVideoDevice`
+- Feedback visual y vibración al detectar
 
 #### 💾 Almacenamiento
 - Cuando se detecta un código:
@@ -48,85 +49,21 @@ Tabla `cedulas_demo` creada con:
   4. Datos se guardan sin parseo complejo (como solicitado)
 
 #### 📊 Lista de Registros
-- Tabla con últimos 5 registros
-- Columnas: Fecha, Datos Crudos (primeros 50 caracteres), Estado, Acciones
-- Botón para eliminar registros
-- Estado: sin_procesar, procesada, error
+- Muestra los últimos 5 escaneos
+- Permite eliminar registros
+- Botón de refresco manual
 
-## 🚀 Cómo Usar
+## 🚀 Cómo Probar
 
-### Instalación
-Las librerías ya están instaladas:
-```bash
-npm install @zxing/browser @zxing/library
-```
+1. Navegar a `/escaner` desde el Dashboard.
+2. Dar permisos de cámara.
+3. Apuntar la cámara al código de barras trasero de la cédula.
+   - **Tip:** Asegurar buena iluminación y que el código esté dentro del recuadro rojo.
+   - **Tip:** Mover lentamente la cámara para permitir el enfoque.
+4. Al detectar, el código aparecerá en el área de texto.
+5. Clic en "Guardar" para enviar a Supabase.
 
-### Crear la Tabla en Supabase
-1. Abre tu proyecto Supabase
-2. Ve a SQL Editor
-3. Copia el contenido de `cedulas_demo.sql`
-4. Ejecuta el SQL
-
-### Acceder al Módulo
-1. Desde el dashboard, ve a "Módulos Experimentales"
-2. Haz clic en "Escáner de Cédulas"
-3. Permite acceso a la cámara
-4. Apunta el código PDF417 hacia la cámara
-5. Espera a que se detecte (puede tomar 1-3 segundos)
-6. Verás el texto crudo en el textarea
-7. Haz clic en "Guardar en BD"
-
-## 🔧 Configuración del Escáner
-
-El lector PDF417 está configurado para:
-- **timeBetweenScans**: 100ms (intenta cada 100ms)
-- **Video**: Cámara trasera (environment)
-- **Formato**: PDF417 (formato difícil, requiere buena iluminación)
-
-## 📌 Notas Importantes
-
-- ✅ **Completamente independiente**: No interfiere con módulos ISO 9001
-- ✅ **Datos crudos**: Se capturan y guardan sin parseo automático
-- ✅ **Sin validación compleja**: Solo lectura y almacenamiento
-- ⚠️ **Requiere HTTPS o localhost**: Los navegadores modernos solo permiten acceso a cámara en conexiones seguras
-- ⚠️ **Buena iluminación**: PDF417 es difícil, necesita código limpio y bien iluminado
-
-## 📝 Próximas Mejoras (Opcionales)
-
-- [ ] Lógica de parseo de cédulas colombianas
-- [ ] Validación de formato
-- [ ] Extracción de campos (nombre, número, etc.)
-- [ ] OCR para datos adicionales
-- [ ] Caché offline
-
-## 🗂️ Estructura de Archivos
-
-```
-app/
-├── escaner/
-│   ├── page.tsx        # Página principal del escáner
-│   └── layout.tsx      # Layout independiente
-├── dashboard/
-│   └── page.tsx        # Actualizado con link al escáner
-│
-cedulas_demo.sql       # Script para crear tabla
-```
-
-## 🔐 Seguridad
-
-- RLS habilitado en tabla `cedulas_demo`
-- Política temporal permitiendo acceso total (cambiar en producción)
-- No se almacenan datos sensibles en localStorage
-- Datos se envían directamente a Supabase
-
-## 📞 Soporte
-
-Para dudas sobre el módulo:
-- Verifica que tengas permisos de cámara
-- Asegúrate de que el código sea un PDF417 válido
-- Revisa la consola del navegador para errores
-- Confirma que Supabase esté accesible
-
----
-
-**Módulo Experimental v1.0** - Diciembre 2024
+## ⚠️ Notas Técnicas
+- El escaneo de PDF417 en navegadores móviles depende mucho de la calidad de la cámara y el enfoque automático.
+- Se recomienda usar dispositivos con cámaras de alta resolución (1080p+).
+- El modo `TRY_HARDER` consume más CPU pero mejora la tasa de éxito.

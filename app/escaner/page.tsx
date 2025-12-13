@@ -14,9 +14,11 @@ import {
   Check,
   AlertCircle,
   Home,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
-import { BrowserPDF417Reader } from '@zxing/browser';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 export default function EscanerPage() {
   const [cedulasDemo, setCedulasDemo] = useState<any[]>([]);
@@ -25,11 +27,10 @@ export default function EscanerPage() {
   const [scannedData, setScannedData] = useState('');
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserPDF417Reader | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanningIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
 
   useEffect(() => {
     fetchCedulasDemo();
@@ -53,65 +54,59 @@ export default function EscanerPage() {
   };
 
   const startScanning = async () => {
+    setScanning(true);
+    setScannedData('');
+    setCameraError(null);
+    setShowSaveForm(false);
+
     try {
-      setScanning(true);
-      setScannedData('');
+      // Configurar hints para optimizar lectura de PDF417
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+      hints.set(DecodeHintType.TRY_HARDER, true); // Importante para códigos densos
 
-      // Solicitar acceso a la cámara
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
+      const codeReader = new BrowserMultiFormatReader(hints);
 
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-
-      // Inicializar el lector PDF417
-      readerRef.current = new BrowserPDF417Reader();
-
-      // Configurar escaneo rápido (100ms entre intentos)
-      scanningIntervalRef.current = setInterval(async () => {
-        if (videoRef.current && readerRef.current) {
-          try {
-            const result = await readerRef.current.decode(videoRef.current);
-            if (result) {
-              setScannedData(result.getText());
-              setShowSaveForm(true);
-              stopScanning();
-            }
-          } catch (err) {
-            // No se encontró código, continuar escaneando
+      // Iniciar decodificación desde cámara
+      // undefined = cámara por defecto (usualmente trasera en móviles si facingMode no se especifica, 
+      // pero zxing intenta buscar la trasera)
+      const controls = await codeReader.decodeFromVideoDevice(
+        undefined, 
+        videoRef.current!,
+        (result, error, controls) => {
+          if (result) {
+            // Código detectado exitosamente
+            const text = result.getText();
+            console.log('Código detectado:', text);
+            setScannedData(text);
+            setShowSaveForm(true);
+            
+            // Detener escaneo automáticamente
+            controls.stop();
+            setScanning(false);
+            controlsRef.current = null;
+            
+            // Feedback vibración (si soportado)
+            if (navigator.vibrate) navigator.vibrate(200);
           }
+          // Los errores de "NotFoundException" son normales mientras busca, los ignoramos
         }
-      }, 100);
+      );
+      
+      controlsRef.current = controls;
     } catch (error) {
-      console.error('Error al acceder a la cámara:', error);
-      alert('No se pudo acceder a la cámara. Verifica los permisos.');
+      console.error('Error al iniciar cámara:', error);
+      setCameraError('No se pudo acceder a la cámara. Asegúrate de dar permisos y usar HTTPS.');
       setScanning(false);
     }
   };
 
   const stopScanning = () => {
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
+    }
     setScanning(false);
-
-    // Detener el intervalo de escaneo
-    if (scanningIntervalRef.current) {
-      clearInterval(scanningIntervalRef.current);
-      scanningIntervalRef.current = null;
-    }
-
-    // Detener el stream de video
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
   };
 
   const handleSave = async () => {
@@ -125,7 +120,7 @@ export default function EscanerPage() {
         .from('cedulas_demo')
         .insert([{
           data_cruda: scannedData,
-          cedula_parseada: null, // Implementar lógica de parseo más adelante
+          cedula_parseada: null,
           estado: 'sin_procesar'
         }]);
 
@@ -167,9 +162,9 @@ export default function EscanerPage() {
             <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
               <Home size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Escáner de Cédulas Colombianas</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Escáner de Cédulas</h1>
           </div>
-          <p className="text-slate-500 ml-7">Prueba de lectura de códigos PDF417 en tiempo real</p>
+          <p className="text-slate-500 ml-7">Lectura de códigos PDF417 (Cédulas Colombianas)</p>
         </div>
       </div>
 
@@ -182,48 +177,75 @@ export default function EscanerPage() {
             Captura en Vivo
           </h2>
 
-          <div className="bg-slate-900 rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '4/3' }}>
-            {scanning ? (
-              <video
-                ref={videoRef}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400">
+          {cameraError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+              <AlertCircle size={18} />
+              {cameraError}
+            </div>
+          )}
+
+          <div className="relative bg-black rounded-lg overflow-hidden mb-4 aspect-[4/3]">
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              muted
+            />
+            
+            {/* Overlay de guía visual */}
+            {scanning && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-[85%] h-[30%] border-2 border-red-500/80 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                  <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1"></div>
+                  <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1"></div>
+                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1"></div>
+                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1"></div>
+                  
+                  {/* Línea de escaneo animada */}
+                  <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-scan opacity-50"></div>
+                </div>
+                <div className="absolute bottom-4 text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                  Alinea el código de barras aquí
+                </div>
+              </div>
+            )}
+
+            {!scanning && !scannedData && (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-100">
                 <div className="text-center">
-                  <Camera size={48} className="mx-auto mb-2 opacity-50" />
+                  <Camera size={48} className="mx-auto mb-2 opacity-30" />
                   <p>Cámara desactivada</p>
                 </div>
               </div>
             )}
           </div>
 
-          <button
-            onClick={scanning ? stopScanning : startScanning}
-            disabled={loading}
-            className={`w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
-              scanning
-                ? 'bg-red-500 hover:bg-red-600 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
-          >
-            {scanning ? (
-              <>
-                <X size={20} />
-                Detener Escaneo
-              </>
-            ) : (
-              <>
-                <Camera size={20} />
-                Activar Cámara
-              </>
-            )}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={scanning ? stopScanning : startScanning}
+              className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
+                scanning
+                  ? 'bg-red-500 hover:bg-red-600 text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {scanning ? (
+                <>
+                  <X size={20} />
+                  Detener
+                </>
+              ) : (
+                <>
+                  <Camera size={20} />
+                  Activar Cámara
+                </>
+              )}
+            </button>
+          </div>
 
           {scanning && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-700">
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-700 animate-pulse">
               <Loader2 className="animate-spin" size={18} />
-              Escaneando... Apunta el código PDF417 hacia la cámara
+              Buscando código PDF417... Mantén la cédula quieta.
             </div>
           )}
         </div>
@@ -240,10 +262,10 @@ export default function EscanerPage() {
             readOnly
             rows={8}
             placeholder="Los datos escaneados aparecerán aquí..."
-            className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-sm font-mono mb-4 focus:outline-none"
+            className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-sm font-mono mb-4 focus:outline-none resize-none"
           />
 
-          {scannedData && (
+          {scannedData ? (
             <div className="flex gap-2">
               <button
                 onClick={copyToClipboard}
@@ -257,7 +279,7 @@ export default function EscanerPage() {
                 ) : (
                   <>
                     <Copy size={18} />
-                    Copiar Texto
+                    Copiar
                   </>
                 )}
               </button>
@@ -266,27 +288,43 @@ export default function EscanerPage() {
                 className="flex-1 py-2 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium flex items-center justify-center gap-2 transition-colors"
               >
                 <Save size={18} />
-                Guardar en BD
+                Guardar
               </button>
             </div>
-          )}
-
-          {!scannedData && (
+          ) : (
             <div className="p-4 bg-slate-100 rounded-lg text-center text-slate-600">
               <AlertCircle size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Escanea un código PDF417 para ver los datos</p>
+              <p className="text-sm">Escanea un código para ver los datos</p>
             </div>
           )}
+          
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <h4 className="font-bold text-slate-700 mb-2 text-sm">Consejos para escanear:</h4>
+            <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+              <li>Asegúrate de tener <strong>buena iluminación</strong>.</li>
+              <li>Evita reflejos o sombras sobre el código.</li>
+              <li>Mantén la cédula quieta y paralela a la cámara.</li>
+              <li>Acerca o aleja la cámara lentamente hasta que enfoque.</li>
+              <li>El código PDF417 es la barra ancha en la parte trasera.</li>
+            </ul>
+          </div>
         </div>
       </div>
 
       {/* Tabla de Registros */}
       <div className="card">
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <FileText size={20} />
-            Últimos Registros ({cedulasDemo.length})
+            Últimos Registros
           </h3>
+          <button 
+            onClick={fetchCedulasDemo}
+            className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+            title="Actualizar lista"
+          >
+            <RefreshCw size={18} />
+          </button>
         </div>
 
         {loading ? (
@@ -296,7 +334,7 @@ export default function EscanerPage() {
           </div>
         ) : cedulasDemo.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            No hay registros aún. Escanea un código para comenzar.
+            No hay registros aún.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -304,8 +342,7 @@ export default function EscanerPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Datos Crudos (Primeros 50 caracteres)</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Datos (Inicio)</th>
                   <th className="px-6 py-3 text-right font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -316,27 +353,14 @@ export default function EscanerPage() {
                       {new Date(item.created_at).toLocaleString('es-CO')}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="max-w-md">
-                        <p className="text-xs text-slate-700 font-mono break-words bg-slate-50 p-2 rounded border border-slate-200">
-                          {item.data_cruda.substring(0, 50)}
-                          {item.data_cruda.length > 50 ? '...' : ''}
-                        </p>
+                      <div className="max-w-xs truncate font-mono text-xs bg-slate-100 px-2 py-1 rounded">
+                        {item.data_cruda}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        item.estado === 'procesada' ? 'bg-emerald-100 text-emerald-700' :
-                        item.estado === 'error' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {item.estado}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
                         onClick={() => handleDelete(item.id)}
                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Eliminar"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -348,17 +372,17 @@ export default function EscanerPage() {
           </div>
         )}
       </div>
-
-      {/* Info Box */}
-      <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h4 className="font-bold text-blue-900 mb-2">ℹ️ Información:</h4>
-        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-          <li>El formato PDF417 es más complejo que QR. La lectura puede tomar unos segundos.</li>
-          <li>Asegúrate de tener buena iluminación y que el código esté completamente visible.</li>
-          <li>Los datos crudos se guardan tal cual se leen. Lógica de parseo pendiente.</li>
-          <li>Este módulo es completamente independiente del sistema de gestión de calidad.</li>
-        </ul>
-      </div>
+      
+      <style jsx global>{`
+        @keyframes scan {
+          0% { top: 0%; }
+          50% { top: 100%; }
+          100% { top: 0%; }
+        }
+        .animate-scan {
+          animation: scan 2s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
