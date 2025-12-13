@@ -239,16 +239,16 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-400 mt-2">Módulo independiente para prueba de lectura de cédulas colombianas</p>
           </Link>
 
-          {/* Gestión de Eventos */}
-          <Link href="/evento" className="module-card group border-2 border-dashed border-indigo-300 hover:border-indigo-500">
+          {/* Gestión Social & Eventos */}
+          <Link href="/gestion-social" className="module-card group border-2 border-dashed border-indigo-300 hover:border-indigo-500">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
                 <Target className="w-6 h-6 text-indigo-600" />
               </div>
             </div>
-            <h3 className="font-bold text-slate-800 mb-1">Gestión de Eventos</h3>
-            <p className="text-xs font-medium text-slate-500">Control de Convocatoria</p>
-            <p className="text-xs text-slate-400 mt-2">Generación de boletas QR y control de acceso por líder</p>
+            <h3 className="font-bold text-slate-800 mb-1">Gestión Social & Eventos</h3>
+            <p className="text-xs font-medium text-slate-500">Eventos, Líderes y Boletas</p>
+            <p className="text-xs text-slate-400 mt-2">Carnetización de líderes y control de convocatoria con boletas personalizadas.</p>
           </Link>
         </div>
       </div>
