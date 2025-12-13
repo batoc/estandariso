@@ -32,12 +32,21 @@ CREATE TABLE IF NOT EXISTS social_boletas (
     used_at TIMESTAMPTZ
 );
 
--- Políticas de seguridad (abiertas para demo)
+-- Políticas de seguridad (CORREGIDAS PARA PERMITIR INSERT)
 ALTER TABLE social_eventos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public events" ON social_eventos FOR ALL USING (true);
+CREATE POLICY "Public events insert" ON social_eventos FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public events select" ON social_eventos FOR SELECT USING (true);
+CREATE POLICY "Public events update" ON social_eventos FOR UPDATE USING (true);
+CREATE POLICY "Public events delete" ON social_eventos FOR DELETE USING (true);
 
 ALTER TABLE social_lideres ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public leaders" ON social_lideres FOR ALL USING (true);
+CREATE POLICY "Public leaders insert" ON social_lideres FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public leaders select" ON social_lideres FOR SELECT USING (true);
+CREATE POLICY "Public leaders update" ON social_lideres FOR UPDATE USING (true);
+CREATE POLICY "Public leaders delete" ON social_lideres FOR DELETE USING (true);
 
 ALTER TABLE social_boletas ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public tickets" ON social_boletas FOR ALL USING (true);
+CREATE POLICY "Public tickets insert" ON social_boletas FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public tickets select" ON social_boletas FOR SELECT USING (true);
+CREATE POLICY "Public tickets update" ON social_boletas FOR UPDATE USING (true);
+CREATE POLICY "Public tickets delete" ON social_boletas FOR DELETE USING (true);

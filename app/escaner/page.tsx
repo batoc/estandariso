@@ -3,99 +3,209 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import {
-  Camera,
-  Plus,
-  X,
-  Save,
+import { 
+  Camera, 
+  X, 
+  Save, 
+  Trash2, 
+  Copy, 
+  Check, 
+  AlertCircle, 
+  FileText, 
+  Home, 
+  RefreshCw, 
   Loader2,
-  Trash2,
-  Copy,
-  Check,
-  AlertCircle,
-  Home,
-  FileText,
-  RefreshCw
+  Image as ImageIcon,
+  Upload,
+  ScanLine,
+  Search
 } from 'lucide-react';
-import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import Tesseract from 'tesseract.js';
 
 export default function EscanerPage() {
-  const [cedulasDemo, setCedulasDemo] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // --- ESTADOS ---
+  const [activeTab, setActiveTab] = useState<'live' | 'ocr'>('live');
+  
+  // Escáner en Vivo
   const [scanning, setScanning] = useState(false);
   const [scannedData, setScannedData] = useState('');
-  const [showSaveForm, setShowSaveForm] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  
+  const [parsedData, setParsedData] = useState<{ 
+    documento: string; 
+    nombre: string;
+    rh?: string;
+    genero?: string;
+    fechaNacimiento?: string;
+  } | null>(null);
+  const [cameraError, setCameraError] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<IScannerControls | null>(null);
+  const controlsRef = useRef<any>(null);
+
+  // OCR (Fotos)
+  const [cedulaFront, setCedulaFront] = useState<File | null>(null);
+  const [cedulaBack, setCedulaBack] = useState<File | null>(null);
+  const [ocrResult, setOcrResult] = useState<{ 
+    rawText: string; 
+    possibleCC: string;
+    possibleRH?: string;
+    possibleBirth?: string;
+  } | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+
+  // Historial / Guardado
+  const [cedulasDemo, setCedulasDemo] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchCedulasDemo();
     return () => {
-      stopScanning();
+      if (controlsRef.current) {
+        controlsRef.current.stop();
+      }
     };
   }, []);
 
   const fetchCedulasDemo = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('cedulas_demo')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (!error && data) {
-      setCedulasDemo(data);
-    }
+      .limit(20);
+    
+    if (data) setCedulasDemo(data);
     setLoading(false);
   };
 
-  const startScanning = async () => {
-    setScanning(true);
-    setScannedData('');
-    setCameraError(null);
-    setShowSaveForm(false);
-
+  // --- PARSER CÉDULA COLOMBIANA (PDF417) ---
+  const parseColombianID = (raw: string) => {
     try {
-      // Configurar hints para optimizar lectura de PDF417
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
-      hints.set(DecodeHintType.TRY_HARDER, true); // Importante para códigos densos
+      // 1. Identificar inicio de trama válida (PubDSK_1)
+      const startIdx = raw.indexOf('PubDSK_1');
+      if (startIdx === -1 && raw.length < 50) return null; // No parece una cédula válida
 
-      const codeReader = new BrowserMultiFormatReader(hints);
+      // 2. Limpiar caracteres de control pero mantener estructura
+      // Reemplazamos nulos y otros caracteres de control por un separador único '|'
+      const clean = raw.substring(startIdx === -1 ? 0 : startIdx).replace(/[\x00-\x1F\x7F-\x9F]+/g, '|');
+      
+      // 3. Extraer Cédula y Apellido 1 (A veces vienen pegados: 1234567890APELLIDO)
+      // Buscamos un número de 7-10 dígitos seguido opcionalmente de letras
+      const idMatch = clean.match(/(\d{7,10})([A-ZÑ]+)?/);
+      
+      if (!idMatch) return null;
 
-      // Configuración de Alta Resolución (CRÍTICO para PDF417)
-      const constraints = {
-        video: {
-          facingMode: 'environment', // Cámara trasera
-          width: { min: 1280, ideal: 1920 }, // Mínimo HD, ideal Full HD
-          height: { min: 720, ideal: 1080 },
-          focusMode: 'continuous' // Intento de forzar enfoque continuo (no soportado en todos los navegadores)
-        }
+      const documento = idMatch[1];
+      let apellido1 = idMatch[2] || '';
+      
+      // 4. Dividir el resto por el separador para encontrar los otros nombres
+      // La estructura suele ser: ...|ID+Ap1|Ap2|Nom1|Nom2|...
+      // O si Ap1 estaba separado: ...|ID|Ap1|Ap2|Nom1|Nom2|...
+      
+      const parts = clean.split('|').filter(p => p.trim().length > 0);
+      
+      // Buscamos el índice donde encontramos el documento
+      // Nota: parts[docIndex] podría ser "1234567890APELLIDO" o solo "1234567890"
+      const docIndex = parts.findIndex(p => p.includes(documento));
+      
+      if (docIndex === -1) return { documento, nombre: 'Desconocido' };
+
+      // Recuperar partes siguientes
+      let currentIdx = docIndex;
+      
+      // Si el token actual es SOLO el documento, avanzamos al siguiente para Apellido1
+      // Si el token actual TIENE letras, es porque Apellido1 estaba pegado (ya lo tenemos en apellido1)
+      if (!apellido1 && parts[currentIdx] === documento) {
+        currentIdx++;
+        apellido1 = parts[currentIdx] || '';
+      } else if (!apellido1) {
+         // El documento está dentro de parts[currentIdx] pero no lo capturó el regex anterior (raro)
+         apellido1 = parts[currentIdx].replace(documento, '');
+      }
+
+      // Asumimos orden: Apellido1 -> Apellido2 -> Nombre1 -> Nombre2
+      // Pero debemos tener cuidado con no tomar campos de metadata (que empiezan por números o códigos)
+      
+      // Si apellido1 ya lo tenemos (del regex o del paso anterior), el siguiente token es Apellido2
+      // Si apellido1 lo sacamos del regex (estaba pegado), currentIdx sigue siendo docIndex.
+      // El siguiente token (parts[currentIdx + 1]) sería Apellido2.
+      
+      const apellido2 = parts[currentIdx + 1] || '';
+      const nombre1 = parts[currentIdx + 2] || '';
+      const nombre2 = parts[currentIdx + 3] || '';
+
+      // Filtrar basura: Los nombres no suelen tener números ni ser muy cortos (excepto conectores, pero en cédula no suelen ir)
+      // Además, la metadata suele empezar con 0M... o 0F...
+      
+      const rawNames = [apellido1, apellido2, nombre1, nombre2];
+      const validNames = rawNames.filter(n => !n.match(/\d/) && n.length > 1);
+
+      // Extraer Datos Adicionales (Género, RH, Fecha Nacimiento)
+      // Buscamos patrón: (0M|0F)(\d{8}).*(O\+|O-|A\+|A-|B\+|B-|AB\+|AB-)
+      // El regex busca en todo el string limpio
+      const metaMatch = clean.match(/(0[MF])(\d{8})\d{0,15}([OAB][+-]?)/);
+      let rh = '';
+      let genero = '';
+      let fechaNacimiento = '';
+
+      if (metaMatch) {
+        genero = metaMatch[1] === '0M' ? 'Masculino' : 'Femenino';
+        const fechaRaw = metaMatch[2]; // YYYYMMDD
+        fechaNacimiento = `${fechaRaw.substring(0,4)}-${fechaRaw.substring(4,6)}-${fechaRaw.substring(6,8)}`;
+        rh = metaMatch[3];
+      }
+
+      // Reconstruir nombre completo (orden aproximado)
+      // En PDF417 suele ser: Apellido1 Apellido2 Nombre1 Nombre2
+      // Pero validNames ya los tiene en ese orden si la extracción fue lineal
+      const nombreCompleto = validNames.join(' ').trim();
+      
+      return { 
+        documento, 
+        nombre: nombreCompleto,
+        rh,
+        genero,
+        fechaNacimiento
       };
 
-      // Usar decodeFromConstraints en lugar de decodeFromVideoDevice para forzar resolución
-      const controls = await codeReader.decodeFromConstraints(
-        constraints,
+    } catch (e) {
+      console.error("Error parsing ID", e);
+      return null;
+    }
+  };
+
+  // --- ESCÁNER EN VIVO ---
+  const startScanning = async () => {
+    setScanning(true);
+    setCameraError('');
+    setScannedData('');
+    setParsedData(null);
+
+    try {
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+      
+      const codeReader = new BrowserMultiFormatReader(hints);
+      
+      const controls = await codeReader.decodeFromVideoDevice(
+        undefined,
         videoRef.current!,
-        (result, error, controls) => {
+        async (result, error, controls) => {
           if (result) {
-            // Código detectado exitosamente
-            const text = result.getText();
-            console.log('Código detectado:', text);
-            setScannedData(text);
-            setShowSaveForm(true);
-            
-            // Detener escaneo automáticamente
             controls.stop();
-            setScanning(false);
             controlsRef.current = null;
+            setScanning(false);
             
-            // Feedback vibración (si soportado)
-            if (navigator.vibrate) navigator.vibrate(200);
+            const text = result.getText();
+            setScannedData(text);
+            
+            // Intentar parsear
+            const parsed = parseColombianID(text);
+            if (parsed) {
+              setParsedData(parsed);
+              if (navigator.vibrate) navigator.vibrate(200);
+            }
           }
         }
       );
@@ -116,8 +226,74 @@ export default function EscanerPage() {
     setScanning(false);
   };
 
+  // --- OCR (FOTOS) ---
+  const handleOcrScan = async () => {
+    if (!cedulaFront && !cedulaBack) return alert('Sube al menos una imagen de la cédula');
+    setOcrLoading(true);
+    setOcrResult(null);
+
+    try {
+      let extractedText = '';
+      let possibleCC = '';
+      let possibleRH = '';
+      let possibleBirth = '';
+      
+      // Procesar Frontal
+      if (cedulaFront) {
+        const { data: { text } } = await Tesseract.recognize(cedulaFront, 'spa');
+        extractedText += '\n--- FRONTAL ---\n' + text;
+        
+        // Buscar CC en frontal: "NUMERO 1.107.099.984"
+        // A veces OCR lee "NUMERI" o "NUMER0"
+        const frontCC = text.match(/(?:NUMER[O0I])\s*(\d{1,3}[.]?\d{3}[.]?\d{3})/i);
+        if (frontCC) possibleCC = frontCC[1].replace(/\./g, '');
+      }
+
+      // Procesar Trasera
+      if (cedulaBack) {
+        const { data: { text } } = await Tesseract.recognize(cedulaBack, 'spa');
+        extractedText += '\n--- TRASERA ---\n' + text;
+        
+        // Buscar CC en trasera (zona inferior): ...-M-1107099984-...
+        // Patrón: Letra - ID - Fecha
+        const backCC = text.match(/-[MF]-(\d{7,10})-/);
+        if (backCC) possibleCC = backCC[1];
+
+        // Buscar Fecha Nacimiento: "15-JUL-1996"
+        const birthMatch = text.match(/(\d{1,2}-[A-Z]{3}-\d{4})/);
+        if (birthMatch) possibleBirth = birthMatch[1];
+
+        // Buscar RH: "RH O+"
+        const rhMatch = text.match(/RH\s*([OAB][+-]?)/i);
+        if (rhMatch) possibleRH = rhMatch[1];
+      }
+
+      // Fallback simple para CC si no se encontró con patrones específicos
+      if (!possibleCC) {
+        const simpleMatch = extractedText.match(/(\d{8,10})/);
+        if (simpleMatch) possibleCC = simpleMatch[1];
+      }
+
+      setOcrResult({
+        rawText: extractedText,
+        possibleCC,
+        possibleRH,
+        possibleBirth
+      });
+
+    } catch (error: any) {
+      console.error(error);
+      alert('Error al procesar imágenes: ' + error.message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // --- GUARDAR ---
   const handleSave = async () => {
-    if (!scannedData.trim()) {
+    const dataToSave = ocrResult ? ocrResult.rawText : scannedData;
+    
+    if (!dataToSave.trim()) {
       alert('No hay datos para guardar');
       return;
     }
@@ -126,8 +302,8 @@ export default function EscanerPage() {
       const { error } = await supabase
         .from('cedulas_demo')
         .insert([{
-          data_cruda: scannedData,
-          cedula_parseada: null,
+          data_cruda: dataToSave,
+          cedula_parseada: parsedData || (ocrResult?.possibleCC ? { documento: ocrResult.possibleCC } : null),
           estado: 'sin_procesar'
         }]);
 
@@ -136,7 +312,10 @@ export default function EscanerPage() {
       } else {
         alert('Datos guardados exitosamente');
         setScannedData('');
-        setShowSaveForm(false);
+        setParsedData(null);
+        setOcrResult(null);
+        setCedulaFront(null);
+        setCedulaBack(null);
         fetchCedulasDemo();
       }
     } catch (err) {
@@ -154,14 +333,14 @@ export default function EscanerPage() {
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(scannedData);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -171,129 +350,264 @@ export default function EscanerPage() {
             </Link>
             <h1 className="text-2xl font-bold text-slate-800">Escáner de Cédulas</h1>
           </div>
-          <p className="text-slate-500 ml-7">Lectura de códigos PDF417 (Cédulas Colombianas)</p>
+          <p className="text-slate-500 ml-7">Lectura de códigos PDF417 y OCR de Documentos</p>
         </div>
       </div>
 
-      {/* Scanner Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Cámara */}
-        <div className="card p-6">
-          <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Camera size={20} />
-            Captura en Vivo
-          </h2>
+      {/* Tabs */}
+      <div className="flex gap-4 mb-6 border-b border-slate-200 pb-1">
+        <button
+          onClick={() => setActiveTab('live')}
+          className={`px-4 py-2 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
+            activeTab === 'live' 
+              ? 'border-blue-600 text-blue-600' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Camera size={18} /> Escáner en Vivo (PDF417)
+        </button>
+        <button
+          onClick={() => setActiveTab('ocr')}
+          className={`px-4 py-2 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
+            activeTab === 'ocr' 
+              ? 'border-indigo-600 text-indigo-600' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ImageIcon size={18} /> Extracción por Foto (OCR)
+        </button>
+      </div>
 
-          {cameraError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
-              <AlertCircle size={18} />
-              {cameraError}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        {/* --- COLUMNA IZQUIERDA: INPUT --- */}
+        <div className="space-y-6">
+          
+          {/* MODO VIVO */}
+          {activeTab === 'live' && (
+            <div className="card p-6">
+              <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Camera size={20} />
+                Cámara
+              </h2>
+
+              {cameraError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+                  <AlertCircle size={18} />
+                  {cameraError}
+                </div>
+              )}
+
+              <div className="relative bg-black rounded-lg overflow-hidden mb-4 aspect-[4/3]">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                />
+                
+                {/* Overlay de guía visual */}
+                {scanning && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[85%] h-[30%] border-2 border-red-500/80 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                      <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1"></div>
+                      <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1"></div>
+                      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1"></div>
+                      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1"></div>
+                      <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-scan opacity-50"></div>
+                    </div>
+                    <div className="absolute bottom-4 text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                      Alinea el código de barras trasero
+                    </div>
+                  </div>
+                )}
+
+                {!scanning && !scannedData && (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-100">
+                    <div className="text-center">
+                      <Camera size={48} className="mx-auto mb-2 opacity-30" />
+                      <p>Cámara desactivada</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={scanning ? stopScanning : startScanning}
+                className={`w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
+                  scanning
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {scanning ? (
+                  <>
+                    <X size={20} /> Detener
+                  </>
+                ) : (
+                  <>
+                    <Camera size={20} /> Activar Cámara
+                  </>
+                )}
+              </button>
             </div>
           )}
 
-          <div className="relative bg-black rounded-lg overflow-hidden mb-4 aspect-[4/3]">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-            />
-            
-            {/* Overlay de guía visual */}
-            {scanning && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-[85%] h-[30%] border-2 border-red-500/80 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                  <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1"></div>
-                  <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1"></div>
-                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1"></div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1"></div>
-                  
-                  {/* Línea de escaneo animada */}
-                  <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-scan opacity-50"></div>
+          {/* MODO OCR */}
+          {activeTab === 'ocr' && (
+            <div className="card p-6">
+              <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Upload size={20} />
+                Subir Fotos
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Cara Frontal</label>
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors relative">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={e => setCedulaFront(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <Upload size={24} />
+                      <span className="text-sm">{cedulaFront ? cedulaFront.name : 'Seleccionar archivo...'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="absolute bottom-4 text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-                  Alinea el código de barras aquí
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Cara Trasera</label>
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors relative">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={e => setCedulaBack(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <Upload size={24} />
+                      <span className="text-sm">{cedulaBack ? cedulaBack.name : 'Seleccionar archivo...'}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {!scanning && !scannedData && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-100">
-                <div className="text-center">
-                  <Camera size={48} className="mx-auto mb-2 opacity-30" />
-                  <p>Cámara desactivada</p>
-                </div>
+                <button 
+                  onClick={handleOcrScan}
+                  disabled={ocrLoading || (!cedulaFront && !cedulaBack)}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {ocrLoading ? <Loader2 className="animate-spin" /> : <ScanLine />} 
+                  {ocrLoading ? 'Procesando...' : 'Extraer Texto'}
+                </button>
               </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={scanning ? stopScanning : startScanning}
-              className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
-                scanning
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {scanning ? (
-                <>
-                  <X size={20} />
-                  Detener
-                </>
-              ) : (
-                <>
-                  <Camera size={20} />
-                  Activar Cámara
-                </>
-              )}
-            </button>
-          </div>
-
-          {scanning && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col gap-1 text-sm text-blue-700 animate-pulse">
-              <div className="flex items-center gap-2 font-bold">
-                <Loader2 className="animate-spin" size={18} />
-                Modo Alta Resolución (HD) Activo
-              </div>
-              <p className="pl-6 text-xs">
-                El código PDF417 requiere mucho detalle. Si no detecta, <strong>aleja o acerca lentamente</strong> la cámara para ayudar al enfoque.
-              </p>
             </div>
           )}
         </div>
 
-        {/* Datos Escaneados */}
-        <div className="card p-6">
+        {/* --- COLUMNA DERECHA: RESULTADOS --- */}
+        <div className="card p-6 h-fit">
           <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
             <FileText size={20} />
-            Datos Capturados
+            Resultados
           </h2>
 
-          <textarea
-            value={scannedData}
-            readOnly
-            rows={8}
-            placeholder="Los datos escaneados aparecerán aquí..."
-            className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-sm font-mono mb-4 focus:outline-none resize-none"
-          />
+          {/* Resultado Parseado (PDF417) */}
+          {parsedData && (
+            <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <h3 className="font-bold text-emerald-800 mb-2 flex items-center gap-2">
+                <Check size={18} /> Datos Identificados
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="block text-xs text-emerald-600 font-bold uppercase">Nombre Completo</span>
+                  <span className="text-slate-800 font-medium">{parsedData.nombre}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs text-emerald-600 font-bold uppercase">Documento (CC)</span>
+                    <span className="text-slate-800 font-medium">{parsedData.documento}</span>
+                  </div>
+                  {parsedData.rh && (
+                    <div>
+                      <span className="block text-xs text-emerald-600 font-bold uppercase">RH</span>
+                      <span className="text-slate-800 font-medium">{parsedData.rh}</span>
+                    </div>
+                  )}
+                </div>
+                {(parsedData.genero || parsedData.fechaNacimiento) && (
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-emerald-100">
+                    {parsedData.genero && (
+                      <div>
+                        <span className="block text-xs text-emerald-600 font-bold uppercase">Género</span>
+                        <span className="text-slate-800 font-medium">{parsedData.genero}</span>
+                      </div>
+                    )}
+                    {parsedData.fechaNacimiento && (
+                      <div>
+                        <span className="block text-xs text-emerald-600 font-bold uppercase">Fecha Nacimiento</span>
+                        <span className="text-slate-800 font-medium">{parsedData.fechaNacimiento}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-          {scannedData ? (
+          {/* Resultado OCR */}
+          {ocrResult && (
+            <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2">
+                <ScanLine size={18} /> Resultado OCR
+              </h3>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {ocrResult.possibleCC && (
+                  <div className="p-2 bg-white rounded border border-indigo-100 text-sm">
+                    <span className="block text-xs font-bold text-indigo-600 uppercase">Cédula</span> 
+                    {ocrResult.possibleCC}
+                  </div>
+                )}
+                {ocrResult.possibleRH && (
+                  <div className="p-2 bg-white rounded border border-indigo-100 text-sm">
+                    <span className="block text-xs font-bold text-indigo-600 uppercase">RH</span> 
+                    {ocrResult.possibleRH}
+                  </div>
+                )}
+                {ocrResult.possibleBirth && (
+                  <div className="p-2 bg-white rounded border border-indigo-100 text-sm col-span-2">
+                    <span className="block text-xs font-bold text-indigo-600 uppercase">Fecha Nacimiento</span> 
+                    {ocrResult.possibleBirth}
+                  </div>
+                )}
+              </div>
+              <div className="max-h-40 overflow-y-auto text-xs font-mono bg-white p-2 rounded border border-indigo-100 text-slate-600 whitespace-pre-wrap">
+                {ocrResult.rawText}
+              </div>
+            </div>
+          )}
+
+          {/* Datos Crudos (Textarea) */}
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Datos Crudos / Log</label>
+            <textarea
+              value={ocrResult ? ocrResult.rawText : scannedData}
+              readOnly
+              rows={6}
+              placeholder="Esperando datos..."
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-xs font-mono focus:outline-none resize-none"
+            />
+          </div>
+
+          {(scannedData || ocrResult) ? (
             <div className="flex gap-2">
               <button
-                onClick={copyToClipboard}
+                onClick={() => copyToClipboard(ocrResult ? ocrResult.rawText : scannedData)}
                 className="flex-1 py-2 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium flex items-center justify-center gap-2 transition-colors"
               >
-                {copied ? (
-                  <>
-                    <Check size={18} />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy size={18} />
-                    Copiar
-                  </>
-                )}
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+                {copied ? 'Copiado' : 'Copiar'}
               </button>
               <button
                 onClick={handleSave}
@@ -305,21 +619,10 @@ export default function EscanerPage() {
             </div>
           ) : (
             <div className="p-4 bg-slate-100 rounded-lg text-center text-slate-600">
-              <AlertCircle size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Escanea un código para ver los datos</p>
+              <Search size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Escanea o sube una foto para ver resultados</p>
             </div>
           )}
-          
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <h4 className="font-bold text-slate-700 mb-2 text-sm">Consejos para escanear:</h4>
-            <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
-              <li>Asegúrate de tener <strong>buena iluminación</strong>.</li>
-              <li>Evita reflejos o sombras sobre el código.</li>
-              <li>Mantén la cédula quieta y paralela a la cámara.</li>
-              <li>Acerca o aleja la cámara lentamente hasta que enfoque.</li>
-              <li>El código PDF417 es la barra ancha en la parte trasera.</li>
-            </ul>
-          </div>
         </div>
       </div>
 
@@ -328,7 +631,7 @@ export default function EscanerPage() {
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <FileText size={20} />
-            Últimos Registros
+            Historial de Escaneos
           </h3>
           <button 
             onClick={fetchCedulasDemo}
@@ -354,7 +657,7 @@ export default function EscanerPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Datos (Inicio)</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Datos</th>
                   <th className="px-6 py-3 text-right font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -365,9 +668,16 @@ export default function EscanerPage() {
                       {new Date(item.created_at).toLocaleString('es-CO')}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="max-w-xs truncate font-mono text-xs bg-slate-100 px-2 py-1 rounded">
-                        {item.data_cruda}
-                      </div>
+                      {item.cedula_parseada ? (
+                        <div className="text-xs">
+                          <div className="font-bold text-slate-800">{item.cedula_parseada.nombre}</div>
+                          <div className="text-slate-500">CC: {item.cedula_parseada.documento}</div>
+                        </div>
+                      ) : (
+                        <div className="max-w-xs truncate font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
+                          {item.data_cruda}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
