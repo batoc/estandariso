@@ -181,32 +181,6 @@ export default function EscanerPage() {
     }
   };
 
-      if (metaMatch) {
-        genero = metaMatch[1] === '0M' ? 'Masculino' : 'Femenino';
-        const fechaRaw = metaMatch[2]; // YYYYMMDD
-        fechaNacimiento = `${fechaRaw.substring(0,4)}-${fechaRaw.substring(4,6)}-${fechaRaw.substring(6,8)}`;
-        rh = metaMatch[3];
-      }
-
-      // Reconstruir nombre completo (orden aproximado)
-      // En PDF417 suele ser: Apellido1 Apellido2 Nombre1 Nombre2
-      // Pero validNames ya los tiene en ese orden si la extracción fue lineal
-      const nombreCompleto = validNames.join(' ').trim();
-      
-      return { 
-        documento, 
-        nombre: nombreCompleto,
-        rh,
-        genero,
-        fechaNacimiento
-      };
-
-    } catch (e) {
-      console.error("Error parsing ID", e);
-      return null;
-    }
-  };
-
   // --- ESCÁNER EN VIVO ---
   const startScanning = async () => {
     setScanning(true);
