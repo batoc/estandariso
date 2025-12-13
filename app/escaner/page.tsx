@@ -84,52 +84,71 @@ export default function EscanerPage() {
     try {
       // 1. Identificar inicio de trama válida (PubDSK_1)
       const startIdx = raw.indexOf('PubDSK_1');
-      // Si no hay PubDSK_1, intentamos buscar el patrón de Cédula+Apellido directamente
-      // (A veces el header no se lee bien)
-      
       const workingRaw = startIdx !== -1 ? raw.substring(startIdx) : raw;
       
       // 2. Limpiar caracteres de control
       // Reemplazamos nulos (\0) y otros caracteres no imprimibles por '|'
       const clean = workingRaw.replace(/[\x00-\x1F\x7F-\x9F]+/g, '|');
       
-      // 3. Buscar el patrón clave: Cédula (8-10 dígitos) pegada o seguida de Apellido1 (Letras mayúsculas)
-      // Ejemplo: ...|1144086542MARTINEZ|...
-      // Regex: Busca dígitos seguidos inmediatamente de letras, O dígitos seguidos de separador y letras
-      const mainMatch = clean.match(/(\d{7,10})([A-ZÑ]+)/);
+      // 3. Estrategia 1: Buscar Cédula pegada a Apellido (Ej: 1144086542MARTINEZ)
+      let documento = '';
+      let apellido1 = '';
+      let namesFound: string[] = [];
       
-      if (!mainMatch) return null;
+      // Regex: Busca dígitos seguidos inmediatamente de letras
+      const concatMatch = clean.match(/(\d{7,10})([A-ZÑ]+)/);
+      
+      if (concatMatch) {
+        documento = concatMatch[1];
+        apellido1 = concatMatch[2];
+      } else {
+        // Estrategia 2: Buscar Cédula aislada (Ej: |1144086542|MARTINEZ|)
+        // Buscamos números de 7-10 dígitos rodeados de separadores o al inicio
+        const isolatedMatch = clean.match(/(?:^|\|)(\d{7,10})(?:\||$)/);
+        if (isolatedMatch) {
+          documento = isolatedMatch[1];
+          // El apellido1 lo buscaremos en los tokens siguientes
+        }
+      }
 
-      const documento = mainMatch[1];
-      const apellido1 = mainMatch[2]; // En este formato, el apellido1 suele venir pegado
-      
+      if (!documento) return null;
+
       // 4. Buscar el resto de nombres
-      // Dividimos por '|' y buscamos el bloque que contiene "Documento+Apellido1"
       const parts = clean.split('|').filter(p => p.trim().length > 0);
-      
-      // Encontramos el índice del bloque que contiene la cédula
       const docIndex = parts.findIndex(p => p.includes(documento));
       
       if (docIndex === -1) return { documento, nombre: 'Desconocido' };
 
-      // Los siguientes bloques deberían ser Apellido2, Nombre1, Nombre2
-      // Validamos que sean solo letras y no sean metadatos (que empiezan por números)
+      // Recuperar nombres
+      let currentIdx = docIndex;
       
-      let namesFound = [apellido1];
+      if (!apellido1) {
+        // Verificar si el token actual tiene letras (caso raro donde regex falló pero split no)
+        const currentPart = parts[currentIdx];
+        const textInCurrent = currentPart.replace(documento, '').replace(/[^A-ZÑ]/g, '');
+        
+        if (textInCurrent.length > 1) {
+          apellido1 = textInCurrent;
+        } else {
+          // Tomar el siguiente token
+          currentIdx++;
+          apellido1 = parts[currentIdx] || '';
+        }
+      }
+
+      namesFound.push(apellido1);
       
-      // Iteramos los siguientes 3 bloques
+      // Buscar Apellido2, Nombre1, Nombre2 (siguientes 3 tokens)
       for (let i = 1; i <= 3; i++) {
-        const part = parts[docIndex + i];
+        const part = parts[currentIdx + i];
+        // Validar que sea nombre (letras) y no metadata (empieza por 0M, 0F, números)
         if (part && /^[A-ZÑ\s]+$/.test(part) && part.length > 1) {
           namesFound.push(part);
         } else {
-          // Si encontramos algo que no es nombre (ej: 0M...), paramos
           break;
         }
       }
       
-      // Reconstruir nombre (Apellido1 Apellido2 Nombre1 Nombre2)
-      // Nota: En la cédula el orden es Ap1 Ap2 Nom1 Nom2
       const nombreCompleto = namesFound.join(' ').trim();
 
       // 5. Extraer Metadatos (Género, Fecha Nacimiento, RH)
