@@ -467,3 +467,59 @@ export interface ResumenEntradas {
   desempeno_procesos: DesempenoProceso[];
   partes_interesadas: ParteInteresada[];
 }
+
+// ============================================
+// 4.1 CONTEXTO DE LA ORGANIZACIÓN - DOFA
+// ============================================
+
+export interface AreaContexto {
+  id: string;
+  created: string;
+  updated: string;
+  nombre: string;
+  descripcion?: string;
+  color?: string;
+  orden?: number;
+  activa: boolean;
+}
+
+export interface DofaElemento {
+  id: string;
+  created: string;
+  updated: string;
+  tipo_dofa: 'debilidad' | 'oportunidad' | 'fortaleza' | 'amenaza';
+  descripcion: string;
+  area_id?: string;
+  expand?: { area_id?: AreaContexto };
+  identificado_por?: string;
+  fecha_identificacion?: string;
+  contexto?: 'interno' | 'externo';
+  consolidado?: boolean;
+  observaciones?: string;
+}
+
+export type PilarEstrategico = 'eficiencia_integral' | 'experiencia_cliente' | 'cultura_innovadora' | 'gestion_talento_humano';
+export type TipoProyecto = 'mejoramiento' | 'extension' | 'transformacion';
+export type NivelRecursos = 'alto' | 'bajo';
+export type DificultadImplementacion = 'alta' | 'media' | 'baja';
+
+export interface EstrategiaContexto {
+  id: string;
+  created: string;
+  updated: string;
+  titulo: string;
+  descripcion: string;
+  tipo_estrategia: 'FO' | 'FA' | 'DO' | 'DA';
+  elementos_dofa?: string[];
+  expand?: { elementos_dofa?: DofaElemento[] };
+  pilar_estrategico: PilarEstrategico;
+  tipo_proyecto: TipoProyecto;
+  nivel_recursos: NivelRecursos;
+  dificultad_implementacion: DificultadImplementacion;
+  responsable?: string;
+  fecha_inicio?: string;
+  fecha_meta?: string;
+  estado: 'propuesta' | 'aprobada' | 'en_ejecucion' | 'completada' | 'cancelada';
+  porcentaje_avance?: number;
+  observaciones?: string;
+}

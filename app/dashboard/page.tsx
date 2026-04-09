@@ -16,8 +16,7 @@ import {
   Lightbulb,
   TrendingUp,
   Plus,
-  Info,
-  Compass
+  Info
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -36,25 +35,6 @@ export default function DashboardPage() {
           <Link href="/nueva-revision" className="btn-primary flex items-center gap-2">
             <Plus size={18} />
             Nueva Revisión
-          </Link>
-        </div>
-      </div>
-
-      {/* Sección: Cláusula 4 - Contexto de la Organización */}
-      <div className="mb-8">
-        <h2 className="text-lg font-bold text-slate-700 mb-3 flex items-center gap-2">
-          <Compass size={20} className="text-indigo-600" />
-          Cláusula 4 — Contexto de la Organización
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <Link href="/contexto" className="module-card group">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
-                <Compass className="w-6 h-6 text-indigo-600" />
-              </div>
-            </div>
-            <h3 className="font-bold text-slate-800 mb-1">Análisis de Contexto</h3>
-            <p className="text-xs font-medium text-slate-400">Cláusula 4.1 · DOFA & Estrategias</p>
           </Link>
         </div>
       </div>
