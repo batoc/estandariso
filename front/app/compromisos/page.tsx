@@ -125,12 +125,12 @@ export default function CompromisosPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
+            <Link href="/dashboard" className="text-slate-400 hover:text-indigo-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Compromisos</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Compromisos</h1>
           </div>
-          <p className="text-slate-500 ml-7">Seguimiento de acciones y compromisos (9.3)</p>
+          <p className="text-sm text-slate-500 mt-1 ml-7">Seguimiento de acciones y compromisos (9.3)</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -143,52 +143,52 @@ export default function CompromisosPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="card p-4 border-l-4 border-blue-500">
+        <div className="card p-4 border border-slate-200/80">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Total Compromisos</p>
-              <p className="text-2xl font-bold text-slate-800">{compromisos.length}</p>
+              <p className="text-xs font-medium text-slate-500">Total Compromisos</p>
+              <p className="text-2xl font-bold text-slate-900">{compromisos.length}</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
+            <div className="p-2 bg-blue-50 rounded-lg">
               <CheckSquare className="text-blue-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-yellow-500">
+        <div className="card p-4 border border-slate-200/80">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Pendientes</p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xs font-medium text-slate-500">Pendientes</p>
+              <p className="text-2xl font-bold text-slate-900">
                 {compromisos.filter(c => c.estado === 'pendiente').length}
               </p>
             </div>
-            <div className="p-3 bg-yellow-50 rounded-lg">
+            <div className="p-2 bg-yellow-50 rounded-lg">
               <Clock className="text-yellow-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-emerald-500">
+        <div className="card p-4 border border-slate-200/80">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Completados</p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xs font-medium text-slate-500">Completados</p>
+              <p className="text-2xl font-bold text-slate-900">
                 {compromisos.filter(c => c.estado === 'completado').length}
               </p>
             </div>
-            <div className="p-3 bg-emerald-50 rounded-lg">
+            <div className="p-2 bg-emerald-50 rounded-lg">
               <CheckCircle2 className="text-emerald-600" size={24} />
             </div>
           </div>
         </div>
-        <div className="card p-4 border-l-4 border-rose-500">
+        <div className="card p-4 border border-slate-200/80">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Vencidos</p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xs font-medium text-slate-500">Vencidos</p>
+              <p className="text-2xl font-bold text-slate-900">
                 {compromisos.filter(c => c.estado === 'vencido').length}
               </p>
             </div>
-            <div className="p-3 bg-rose-50 rounded-lg">
+            <div className="p-2 bg-rose-50 rounded-lg">
               <AlertTriangle className="text-rose-600" size={24} />
             </div>
           </div>
@@ -223,13 +223,13 @@ export default function CompromisosPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50/80 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Descripción</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Responsable</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Descripción</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Responsable</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -301,21 +301,18 @@ export default function CompromisosPage() {
 
       {/* Modal Formulario */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-              <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? 'Editar Compromiso' : 'Nuevo Compromiso'}
-              </h2>
-              <button 
-                onClick={resetForm}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <>
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={resetForm} />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-slide-in">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {editingId ? 'Editar Compromiso' : 'Nuevo Compromiso'}
+                </h2>
+              </div>
+              
+              <form onSubmit={handleSubmit}>
+                <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                 <textarea
@@ -396,25 +393,27 @@ export default function CompromisosPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Save size={18} />
-                  {editingId ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
-            </form>
+                </div>
+                <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="btn-secondary"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <Save size={18} />
+                    {editingId ? 'Actualizar' : 'Guardar'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

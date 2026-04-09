@@ -69,12 +69,12 @@ export default function OrganizacionPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link href="/dashboard" className="text-slate-400 hover:text-blue-600 transition-colors">
+            <Link href="/dashboard" className="text-slate-400 hover:text-indigo-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-800">Organización</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Organización</h1>
           </div>
-          <p className="text-slate-500 ml-7">Direccionamiento estratégico, pilares, áreas y colaboradores</p>
+          <p className="text-sm text-slate-500 mt-1 ml-7">Direccionamiento estratégico, pilares, áreas y colaboradores</p>
         </div>
       </div>
 

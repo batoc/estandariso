@@ -149,7 +149,6 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
     descripcion: '',
     area_id: '',
     identificado_por_id: '',
-    fecha_identificacion: new Date().toISOString().split('T')[0],
     contexto: 'interno' as 'interno' | 'externo',
   });
 
@@ -181,7 +180,7 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
         descripcion: form.descripcion,
         area_id: form.area_id || null,
         identificado_por_id: form.identificado_por_id || null,
-        fecha_identificacion: form.fecha_identificacion || null,
+        fecha_identificacion: new Date().toISOString(),
         contexto: form.contexto,
       };
       if (editingId) {
@@ -202,7 +201,6 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
       descripcion: el.descripcion,
       area_id: el.area_id || '',
       identificado_por_id: el.identificado_por_id || '',
-      fecha_identificacion: el.fecha_identificacion?.split('T')[0] || '',
       contexto: el.contexto || DOFA_CONFIG[el.tipo_dofa].contexto,
     });
     setShowForm(true);
@@ -218,7 +216,7 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
   }
 
   function resetForm() {
-    setForm({ tipo_dofa: 'fortaleza', descripcion: '', area_id: '', identificado_por_id: '', fecha_identificacion: new Date().toISOString().split('T')[0], contexto: 'interno' });
+    setForm({ tipo_dofa: 'fortaleza', descripcion: '', area_id: '', identificado_por_id: '', contexto: 'interno' });
     setEditingId(null);
     setShowForm(false);
   }
@@ -301,8 +299,8 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
                 placeholder={`Describe la ${DOFA_CONFIG[form.tipo_dofa].label.toLowerCase()} identificada...`} />
             </div>
 
-            {/* Row 3: Área + Identificado por + Fecha */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 3: Área + Identificado por */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Área</label>
                 <select value={form.area_id} onChange={e => setForm({ ...form, area_id: e.target.value })} className="input-field">
@@ -318,10 +316,6 @@ function TabDOFA({ elementos, areas, colaboradores, onReload }: {
                     <option key={c.id} value={c.id}>{c.nombre} {c.apellido || ''}{c.cargo ? ` — ${c.cargo}` : ''}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Fecha</label>
-                <input type="date" value={form.fecha_identificacion} onChange={e => setForm({ ...form, fecha_identificacion: e.target.value })} className="input-field" />
               </div>
             </div>
 
