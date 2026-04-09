@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EstandarISO - Sistema de Gestión ISO 9001
 
-## Getting Started
+Plataforma integral para la Revisión por la Dirección y gestión de calidad ISO 9001:2015.
 
-First, run the development server:
+## Estructura del Proyecto
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+estandariso/
+├── front/          # Frontend - Next.js 16 + React 19 + Tailwind CSS
+│   ├── app/        # Rutas y páginas
+│   ├── components/ # Componentes reutilizables
+│   ├── lib/        # Utilidades (PocketBase client, types)
+│   └── public/     # Archivos estáticos
+├── back/           # Backend - PocketBase
+│   ├── pocketbase  # Binario de PocketBase
+│   ├── pb_migrations/ # Migraciones de colecciones
+│   └── pb_data/    # Datos (no se sube a git)
+└── deploy/         # Scripts de despliegue
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Desarrollo Local
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Backend (PocketBase)
+```bash
+cd back
+./pocketbase serve
+```
+PocketBase estará disponible en `http://127.0.0.1:8090`.
+Admin UI: `http://127.0.0.1:8090/_/`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Frontend (Next.js)
+```bash
+cd front
+npm install
+npm run dev
+```
+Frontend estará disponible en `http://localhost:3000`.
 
-## Learn More
+## Despliegue
 
-To learn more about Next.js, take a look at the following resources:
+El proyecto se despliega automáticamente al hacer push a `main` usando GitHub Actions.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Servidor:** Hetzner CPX11 - 178.156.250.64
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Módulos ISO 9001:2015 (Cláusula 9.3)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Compromisos Previos** (9.3.2.a)
+- **Gestión de Cambios** (9.3.2.b)
+- **Satisfacción del Cliente** (9.3.2.c.1)
+- **PQRS** (9.3.2.c.1)
+- **Objetivos de Calidad** (9.3.2.c.2)
+- **Inspecciones** (9.3.2.c.3)
+- **No Conformidades** (9.3.2.c.4)
+- **Indicadores / KPIs** (9.3.2.c.5)
+- **Auditorías** (9.3.2.c.6)
+- **Proveedores** (9.3.2.c.7)
+- **Recursos** (9.3.2.d)
+- **Riesgos y Oportunidades** (6.1)
+- **Mejora Continua** (10.3)
