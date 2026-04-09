@@ -17,7 +17,9 @@ import {
   TrendingUp,
   Plus,
   Info,
-  Compass
+  Compass,
+  Building2,
+  Users
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -47,6 +49,15 @@ export default function DashboardPage() {
           Cláusula 4 — Contexto de la Organización
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <Link href="/organizacion" className="module-card group">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Building2 className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+            <h3 className="font-bold text-slate-800 mb-1">Organización</h3>
+            <p className="text-xs font-medium text-slate-400">Direccionamiento · Áreas · Colaboradores</p>
+          </Link>
           <Link href="/contexto" className="module-card group">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">

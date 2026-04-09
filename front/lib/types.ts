@@ -490,17 +490,19 @@ export interface DofaElemento {
   tipo_dofa: 'debilidad' | 'oportunidad' | 'fortaleza' | 'amenaza';
   descripcion: string;
   area_id?: string;
-  expand?: { area_id?: AreaContexto };
+  expand?: { area_id?: AreaContexto; identificado_por_id?: Colaborador };
   identificado_por?: string;
+  identificado_por_id?: string;
   fecha_identificacion?: string;
   contexto?: 'interno' | 'externo';
   consolidado?: boolean;
   observaciones?: string;
 }
 
-export type PilarEstrategico = 'eficiencia_integral' | 'experiencia_cliente' | 'cultura_innovadora' | 'gestion_talento_humano';
+export type PilarEstrategicoKey = 'eficiencia_integral' | 'experiencia_cliente' | 'cultura_innovadora' | 'gestion_talento_humano';
+export type PilarEstrategico = PilarEstrategicoKey; // backward compat alias
 export type TipoProyecto = 'mejoramiento' | 'extension' | 'transformacion';
-export type NivelRecursos = 'alto' | 'bajo';
+export type NivelRecursos = 'alto' | 'medio' | 'bajo';
 export type DificultadImplementacion = 'alta' | 'media' | 'baja';
 
 export interface EstrategiaContexto {
@@ -517,9 +519,67 @@ export interface EstrategiaContexto {
   nivel_recursos: NivelRecursos;
   dificultad_implementacion: DificultadImplementacion;
   responsable?: string;
+  responsable_id?: string;
+  area_responsable?: string;
   fecha_inicio?: string;
   fecha_meta?: string;
   estado: 'propuesta' | 'aprobada' | 'en_ejecucion' | 'completada' | 'cancelada';
   porcentaje_avance?: number;
   observaciones?: string;
+}
+
+// ============================================
+// ORGANIZACIÓN (Direccionamiento Estratégico)
+// ============================================
+export interface Organizacion {
+  id: string;
+  created: string;
+  updated: string;
+  nombre_empresa: string;
+  proposito_superior?: string;
+  objetivo_estrategico?: string;
+  resumen_estrategia?: string;
+  mision?: string;
+  vision?: string;
+  valores?: string[];
+  logo_url?: string;
+}
+
+// ============================================
+// PILARES ESTRATÉGICOS (registro editable)
+// ============================================
+export interface PilarEstrategicoRecord {
+  id: string;
+  created: string;
+  updated: string;
+  nombre: string;
+  descripcion?: string;
+  color?: string;
+  icono?: string;
+  orden?: number;
+  activo: boolean;
+}
+
+// ============================================
+// COLABORADORES
+// ============================================
+export type RolArea = 'director' | 'coordinador' | 'analista' | 'operativo' | 'pasante';
+export type Permiso = 'admin' | 'edicion' | 'consulta' | 'cargue';
+
+export interface Colaborador {
+  id: string;
+  created: string;
+  updated: string;
+  nombre: string;
+  apellido?: string;
+  email?: string;
+  telefono?: string;
+  cargo?: string;
+  area_id?: string;
+  expand?: { area_id?: AreaContexto };
+  rol_area?: RolArea;
+  permisos?: Permiso[];
+  activo: boolean;
+  fecha_ingreso?: string;
+  foto_url?: string;
 }
