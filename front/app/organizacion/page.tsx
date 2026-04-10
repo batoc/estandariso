@@ -7,8 +7,31 @@ import type { Organizacion, PilarEstrategicoRecord, AreaContexto, Colaborador, R
 import {
   ArrowLeft, Plus, Save, X, Loader2, Edit, Trash2,
   Building2, Target, Layers, Users, Eye, CheckCircle2,
-  Briefcase, Mail, Phone, Shield
+  Mail, ExternalLink, AlertTriangle, Clock, CalendarCheck
 } from 'lucide-react';
+
+// ── Vigencia helper ──────────────────────────────────────────
+function VigenciaBadge({ fecha }: { fecha?: string }) {
+  if (!fecha) return <span className="text-xs text-slate-400 italic">Sin fecha de vigencia</span>;
+  const today = new Date();
+  const exp = new Date(fecha);
+  const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+      <AlertTriangle size={11} /> Vencido · {exp.toLocaleDateString('es-CO')}
+    </span>
+  );
+  if (diffDays <= 30) return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+      <Clock size={11} /> Vence en {diffDays}d · {exp.toLocaleDateString('es-CO')}
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+      <CalendarCheck size={11} /> Vigente hasta {exp.toLocaleDateString('es-CO')}
+    </span>
+  );
+}
 
 const ROL_LABELS: Record<RolArea, string> = {
   director: 'Director',
@@ -33,7 +56,7 @@ const PERMISO_COLORS: Record<Permiso, string> = {
 };
 
 export default function OrganizacionPage() {
-  const [tab, setTab] = useState<'direccionamiento' | 'pilares' | 'areas' | 'colaboradores'>('direccionamiento');
+  const [tab, setTab] = useState<'estrategia' | 'areas' | 'colaboradores'>('estrategia');
   const [org, setOrg] = useState<Organizacion | null>(null);
   const [pilares, setPilares] = useState<PilarEstrategicoRecord[]>([]);
   const [areas, setAreas] = useState<AreaContexto[]>([]);
@@ -81,8 +104,7 @@ export default function OrganizacionPage() {
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6">
         {([
-          { key: 'direccionamiento', label: 'Direccionamiento', icon: Target },
-          { key: 'pilares', label: 'Pilares Estratégicos', icon: Layers },
+          { key: 'estrategia', label: 'Estrategia', icon: Target },
           { key: 'areas', label: 'Áreas', icon: Building2 },
           { key: 'colaboradores', label: 'Colaboradores', icon: Users },
         ] as const).map(t => (
@@ -95,8 +117,7 @@ export default function OrganizacionPage() {
         ))}
       </div>
 
-      {tab === 'direccionamiento' && <TabDireccionamiento org={org} onReload={cargarTodo} />}
-      {tab === 'pilares' && <TabPilares pilares={pilares} onReload={cargarTodo} />}
+      {tab === 'estrategia' && <TabEstrategia org={org} pilares={pilares} onReload={cargarTodo} />}
       {tab === 'areas' && <TabAreas areas={areas} onReload={cargarTodo} />}
       {tab === 'colaboradores' && <TabColaboradores colaboradores={colaboradores} areas={areas} onReload={cargarTodo} />}
     </div>
@@ -104,9 +125,24 @@ export default function OrganizacionPage() {
 }
 
 // ═══════════════════════════════════════════════════════
-// TAB: DIRECCIONAMIENTO ESTRATÉGICO
+// TAB COMBINADO: ESTRATEGIA (Direccionamiento + Pilares)
 // ═══════════════════════════════════════════════════════
-function TabDireccionamiento({ org, onReload }: { org: Organizacion | null; onReload: () => Promise<void> }) {
+function TabEstrategia({ org, pilares, onReload }: {
+  org: Organizacion | null;
+  pilares: PilarEstrategicoRecord[];
+  onReload: () => Promise<void>;
+}) {
+  return (
+    <div className="space-y-8">
+      <SectionDireccionamiento org={org} onReload={onReload} />
+      <div className="border-t border-slate-200" />
+      <SectionPilares pilares={pilares} onReload={onReload} />
+    </div>
+  );
+}
+
+// ── Sección: Direccionamiento ────────────────────────────
+function SectionDireccionamiento({ org, onReload }: { org: Organizacion | null; onReload: () => Promise<void> }) {
   const [editing, setEditing] = useState(!org);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -116,16 +152,18 @@ function TabDireccionamiento({ org, onReload }: { org: Organizacion | null; onRe
     resumen_estrategia: org?.resumen_estrategia || '',
     mision: org?.mision || '',
     vision: org?.vision || '',
+    fecha_vigencia: org?.fecha_vigencia?.split('T')[0] || '',
   });
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      const data = { ...form, fecha_vigencia: form.fecha_vigencia || null };
       if (org) {
-        await pb.collection('organizacion').update(org.id, form);
+        await pb.collection('organizacion').update(org.id, data);
       } else {
-        await pb.collection('organizacion').create(form);
+        await pb.collection('organizacion').create(data);
       }
       await onReload();
       setEditing(false);
@@ -135,32 +173,36 @@ function TabDireccionamiento({ org, onReload }: { org: Organizacion | null; onRe
 
   if (!editing && org) {
     return (
-      <div className="space-y-6">
-        {/* Header card */}
-        <div className="card p-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold mb-1">{org.nombre_empresa || 'Mi Organización'}</h2>
-              <p className="text-blue-100 text-sm">Direccionamiento Estratégico</p>
-            </div>
-            <button onClick={() => setEditing(true)} className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors">
-              <Edit size={18} />
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Target size={20} className="text-indigo-600" />
+            <h2 className="text-lg font-bold text-slate-800">Direccionamiento Estratégico</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <VigenciaBadge fecha={org.fecha_vigencia} />
+            <button onClick={() => setEditing(true)} className="p-2 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition-colors">
+              <Edit size={16} />
             </button>
           </div>
         </div>
 
-        {/* Content cards */}
+        {/* Header card */}
+        <div className="card p-5 mb-4 bg-gradient-to-r from-indigo-600 to-blue-700 text-white">
+          <h3 className="text-xl font-bold">{org.nombre_empresa || 'Mi Organización'}</h3>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            { title: 'Propósito Superior', value: org.proposito_superior, icon: '🎯' },
-            { title: 'Objetivo Estratégico', value: org.objetivo_estrategico, icon: '🏆' },
             { title: 'Misión', value: org.mision, icon: '📋' },
             { title: 'Visión', value: org.vision, icon: '🔭' },
+            { title: 'Propósito Superior', value: org.proposito_superior, icon: '🎯' },
+            { title: 'Objetivo Estratégico', value: org.objetivo_estrategico, icon: '🏆' },
           ].map(item => (
-            <div key={item.title} className="card p-5">
+            <div key={item.title} className="card p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{item.icon}</span>
-                <h3 className="font-bold text-slate-700">{item.title}</h3>
+                <span className="text-base">{item.icon}</span>
+                <h4 className="font-semibold text-slate-700 text-sm">{item.title}</h4>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {item.value || <span className="italic text-slate-400">No definido</span>}
@@ -168,12 +210,11 @@ function TabDireccionamiento({ org, onReload }: { org: Organizacion | null; onRe
             </div>
           ))}
         </div>
-
         {org.resumen_estrategia && (
-          <div className="card p-5">
+          <div className="card p-4 mt-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📊</span>
-              <h3 className="font-bold text-slate-700">Resumen de la Estrategia</h3>
+              <span className="text-base">📊</span>
+              <h4 className="font-semibold text-slate-700 text-sm">Resumen de la Estrategia</h4>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{org.resumen_estrategia}</p>
           </div>
@@ -183,56 +224,56 @@ function TabDireccionamiento({ org, onReload }: { org: Organizacion | null; onRe
   }
 
   return (
-    <form onSubmit={handleSave} className="card p-6 space-y-5">
-      <h3 className="text-lg font-bold text-slate-800">
-        {org ? 'Editar' : 'Configurar'} Direccionamiento Estratégico
-      </h3>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre de la Empresa *</label>
-        <input type="text" value={form.nombre_empresa} onChange={e => setForm({ ...form, nombre_empresa: e.target.value })} className="input-field" required placeholder="Nombre de tu organización..." />
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <Target size={20} className="text-indigo-600" />
+        <h2 className="text-lg font-bold text-slate-800">Direccionamiento Estratégico</h2>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSave} className="card p-6 space-y-5">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1">Misión</label>
-          <textarea value={form.mision} onChange={e => setForm({ ...form, mision: e.target.value })} className="input-field" rows={3} placeholder="¿Qué hacemos y para quién?" />
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre de la Empresa *</label>
+          <input type="text" value={form.nombre_empresa} onChange={e => setForm({ ...form, nombre_empresa: e.target.value })} className="input-field" required placeholder="Nombre de tu organización..." />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Misión</label>
+            <textarea value={form.mision} onChange={e => setForm({ ...form, mision: e.target.value })} className="input-field" rows={3} placeholder="¿Qué hacemos y para quién?" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Visión</label>
+            <textarea value={form.vision} onChange={e => setForm({ ...form, vision: e.target.value })} className="input-field" rows={3} placeholder="¿A dónde queremos llegar?" />
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1">Visión</label>
-          <textarea value={form.vision} onChange={e => setForm({ ...form, vision: e.target.value })} className="input-field" rows={3} placeholder="¿A dónde queremos llegar?" />
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Propósito Superior</label>
+          <textarea value={form.proposito_superior} onChange={e => setForm({ ...form, proposito_superior: e.target.value })} className="input-field" rows={3} placeholder="El por qué trascendente de la organización..." />
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1">Propósito Superior</label>
-        <textarea value={form.proposito_superior} onChange={e => setForm({ ...form, proposito_superior: e.target.value })} className="input-field" rows={3} placeholder="El por qué trascendente de la organización..." />
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1">Objetivo Estratégico</label>
-        <textarea value={form.objetivo_estrategico} onChange={e => setForm({ ...form, objetivo_estrategico: e.target.value })} className="input-field" rows={3} placeholder="El objetivo principal que guía la estrategia..." />
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1">Resumen de la Estrategia</label>
-        <textarea value={form.resumen_estrategia} onChange={e => setForm({ ...form, resumen_estrategia: e.target.value })} className="input-field" rows={4} placeholder="Descripción general de la estrategia organizacional..." />
-      </div>
-
-      <div className="flex gap-3 justify-end">
-        {org && <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-2"><X size={16} /> Cancelar</button>}
-        <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar
-        </button>
-      </div>
-    </form>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Objetivo Estratégico</label>
+          <textarea value={form.objetivo_estrategico} onChange={e => setForm({ ...form, objetivo_estrategico: e.target.value })} className="input-field" rows={3} placeholder="El objetivo principal que guía la estrategia..." />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Resumen de la Estrategia</label>
+          <textarea value={form.resumen_estrategia} onChange={e => setForm({ ...form, resumen_estrategia: e.target.value })} className="input-field" rows={3} placeholder="Descripción general de la estrategia organizacional..." />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Vigencia del Direccionamiento Estratégico</label>
+          <input type="date" value={form.fecha_vigencia} onChange={e => setForm({ ...form, fecha_vigencia: e.target.value })} className="input-field !w-auto" />
+          <p className="text-xs text-slate-400 mt-1">Fecha hasta la que son válidos la misión, visión, propósito, objetivos y pilares estratégicos</p>
+        </div>
+        <div className="flex gap-3 justify-end">
+          {org && <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-2"><X size={16} /> Cancelar</button>}
+          <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════
-// TAB: PILARES ESTRATÉGICOS
-// ═══════════════════════════════════════════════════════
-function TabPilares({ pilares, onReload }: { pilares: PilarEstrategicoRecord[]; onReload: () => Promise<void> }) {
+// ── Sección: Pilares Estratégicos ────────────────────────
+function SectionPilares({ pilares, onReload }: { pilares: PilarEstrategicoRecord[]; onReload: () => Promise<void> }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -276,20 +317,23 @@ function TabPilares({ pilares, onReload }: { pilares: PilarEstrategicoRecord[]; 
 
   return (
     <div>
-      <div className="flex gap-3 mb-6">
-        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2"><Plus size={18} /> Nuevo Pilar</button>
-        <p className="text-sm text-slate-500 flex items-center gap-1"><Layers size={14} /> Los pilares estratégicos guían la clasificación de estrategias</p>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Layers size={20} className="text-indigo-600" />
+          <h2 className="text-lg font-bold text-slate-800">Pilares Estratégicos</h2>
+        </div>
+        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 text-sm py-1.5"><Plus size={15} /> Nuevo Pilar</button>
       </div>
 
       {showNew && (
         <form onSubmit={handleSaveNew} className="card p-5 mb-4 border-2 border-blue-200 space-y-3">
           <h4 className="font-bold text-slate-800">Nuevo Pilar Estratégico</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre *</label>
               <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field" required />
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 items-end">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Color</label>
                 <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
@@ -305,62 +349,63 @@ function TabPilares({ pilares, onReload }: { pilares: PilarEstrategicoRecord[]; 
             <textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} className="input-field" rows={2} />
           </div>
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setShowNew(false)} className="btn-secondary"><X size={14} /> Cancelar</button>
+            <button type="button" onClick={() => setShowNew(false)} className="btn-secondary flex items-center gap-1"><X size={14} /> Cancelar</button>
             <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1"><Save size={14} /> Crear</button>
           </div>
         </form>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {pilares.map(p => (
-          <div key={p.id} className={`card p-5 ${!p.activo ? 'opacity-50' : ''}`}>
+          <div key={p.id} className={`card p-4 ${!p.activo ? 'opacity-50' : ''}`}>
             {editingId === p.id ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field" />
-                  <div className="flex gap-3 items-center">
-                    <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" />
-                    <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-20" />
-                  </div>
+                <div className="flex flex-wrap gap-3 items-center">
+                  <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field flex-1" placeholder="Nombre..." />
+                  <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" />
+                  <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-16" />
                 </div>
                 <textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} className="input-field" rows={2} />
                 <div className="flex gap-2 justify-end">
-                  <button onClick={() => setEditingId(null)} className="btn-secondary text-xs"><X size={14} /></button>
-                  <button onClick={() => handleUpdate(p.id)} className="btn-primary text-xs"><Save size={14} /> Guardar</button>
+                  <button onClick={() => setEditingId(null)} className="btn-secondary text-xs flex items-center gap-1"><X size={13} /> Cancelar</button>
+                  <button onClick={() => handleUpdate(p.id)} className="btn-primary text-xs flex items-center gap-1"><Save size={13} /> Guardar</button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="w-4 h-12 rounded-full shrink-0" style={{ backgroundColor: p.color || '#94a3b8' }} />
-                  <div>
-                    <h4 className="font-bold text-slate-800">{p.nombre}</h4>
-                    {p.descripcion && <p className="text-sm text-slate-500 mt-1 leading-relaxed">{p.descripcion}</p>}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-1 h-10 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: p.color || '#94a3b8' }} />
+                    <div>
+                      <h4 className="font-bold text-slate-800 leading-tight">{p.nombre}</h4>
+                      {p.descripcion && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{p.descripcion}</p>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => toggleActivo(p)} className={`p-1.5 rounded-lg ${p.activo ? 'hover:bg-amber-50 text-amber-500' : 'hover:bg-green-50 text-green-500'}`}>
+                      <Eye size={13} />
+                    </button>
+                    <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50"><Edit size={13} className="text-blue-600" /></button>
+                    <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={13} className="text-red-600" /></button>
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <button onClick={() => toggleActivo(p)} className={`p-1.5 rounded-lg text-xs ${p.activo ? 'hover:bg-amber-50 text-amber-600' : 'hover:bg-green-50 text-green-600'}`}>
-                    <Eye size={14} />
-                  </button>
-                  <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50"><Edit size={14} className="text-blue-600" /></button>
-                  <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} className="text-red-600" /></button>
-                </div>
+
               </div>
             )}
           </div>
         ))}
-        {pilares.length === 0 && <p className="text-center text-slate-400 py-12">No hay pilares estratégicos. Crea el primero.</p>}
+        {pilares.length === 0 && <p className="col-span-2 text-center text-slate-400 py-8">No hay pilares estratégicos. Crea el primero.</p>}
       </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════
-// TAB: ÁREAS (moved from contexto)
+// TAB: ÁREAS
 // ═══════════════════════════════════════════════════════
 function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => Promise<void> }) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ nombre: '', descripcion: '', color: '#2563eb', orden: 0 });
+  const [form, setForm] = useState({ nombre: '', descripcion: '', color: '#2563eb', orden: 0, link_daruma: '' });
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -368,9 +413,9 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
     e.preventDefault();
     setSaving(true);
     try {
-      await pb.collection('areas_contexto').create({ ...form, activa: true });
+      await pb.collection('areas_contexto').create({ ...form, link_daruma: form.link_daruma || null, activa: true });
       await onReload();
-      setForm({ nombre: '', descripcion: '', color: '#2563eb', orden: 0 });
+      setForm({ nombre: '', descripcion: '', color: '#2563eb', orden: 0, link_daruma: '' });
       setShowNew(false);
     } catch (err) { console.error(err); }
     finally { setSaving(false); }
@@ -378,7 +423,7 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
 
   async function handleUpdate(id: string) {
     setSaving(true);
-    try { await pb.collection('areas_contexto').update(id, form); await onReload(); setEditingId(null); } catch (err) { console.error(err); }
+    try { await pb.collection('areas_contexto').update(id, { ...form, link_daruma: form.link_daruma || null }); await onReload(); setEditingId(null); } catch (err) { console.error(err); }
     finally { setSaving(false); }
   }
 
@@ -393,7 +438,7 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
 
   function startEdit(a: AreaContexto) {
     setEditingId(a.id);
-    setForm({ nombre: a.nombre, descripcion: a.descripcion || '', color: a.color || '#2563eb', orden: a.orden || 0 });
+    setForm({ nombre: a.nombre, descripcion: a.descripcion || '', color: a.color || '#2563eb', orden: a.orden || 0, link_daruma: a.link_daruma || '' });
   }
 
   return (
@@ -404,21 +449,32 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
       </div>
 
       {showNew && (
-        <form onSubmit={handleSaveNew} className="card p-4 mb-4 border-2 border-blue-200 flex flex-wrap gap-3 items-end">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre *</label>
-            <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field" required />
+        <form onSubmit={handleSaveNew} className="card p-5 mb-4 border-2 border-blue-200 space-y-3">
+          <h4 className="font-bold text-slate-800">Nueva Área</h4>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre *</label>
+              <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Color</label>
+              <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Orden</label>
+              <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-20" />
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Color</label>
-            <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Link Daruma <span className="font-normal text-slate-400">(caracterización del área)</span>
+            </label>
+            <input type="url" value={form.link_daruma} onChange={e => setForm({ ...form, link_daruma: e.target.value })} className="input-field" placeholder="https://daruma.app/..." />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Orden</label>
-            <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-20" />
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setShowNew(false)} className="btn-secondary flex items-center gap-1"><X size={14} /> Cancelar</button>
+            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1"><Save size={14} /> Crear</button>
           </div>
-          <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1"><Save size={14} /> Crear</button>
-          <button type="button" onClick={() => setShowNew(false)} className="btn-secondary"><X size={14} /></button>
         </form>
       )}
 
@@ -426,21 +482,39 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
         {areas.map(a => (
           <div key={a.id} className={`card p-4 flex items-center justify-between gap-4 ${!a.activa ? 'opacity-50' : ''}`}>
             {editingId === a.id ? (
-              <div className="flex flex-wrap gap-3 items-center flex-1">
-                <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field !w-auto" />
-                <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" />
-                <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-16" />
-                <button onClick={() => handleUpdate(a.id)} className="btn-primary text-xs"><Save size={14} /></button>
-                <button onClick={() => setEditingId(null)} className="btn-secondary text-xs"><X size={14} /></button>
+              <div className="flex-1 space-y-3">
+                <div className="flex flex-wrap gap-3 items-center">
+                  <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className="input-field !w-auto" />
+                  <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" />
+                  <input type="number" value={form.orden} onChange={e => setForm({ ...form, orden: Number(e.target.value) })} className="input-field !w-16" />
+                </div>
+                <input type="url" value={form.link_daruma} onChange={e => setForm({ ...form, link_daruma: e.target.value })} className="input-field" placeholder="https://daruma.app/..." />
+                <div className="flex gap-2">
+                  <button onClick={() => handleUpdate(a.id)} className="btn-primary text-xs flex items-center gap-1"><Save size={13} /> Guardar</button>
+                  <button onClick={() => setEditingId(null)} className="btn-secondary text-xs flex items-center gap-1"><X size={13} /> Cancelar</button>
+                </div>
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: a.color || '#94a3b8' }} />
-                  <span className="font-semibold text-slate-800">{a.nombre}</span>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-5 h-5 rounded-full border shrink-0" style={{ backgroundColor: a.color || '#94a3b8' }} />
+                  <div className="min-w-0">
+                    {a.link_daruma ? (
+                      <a href={a.link_daruma} target="_blank" rel="noopener noreferrer"
+                        className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors flex items-center gap-1.5 group">
+                        {a.nombre}
+                        <ExternalLink size={13} className="text-slate-400 group-hover:text-indigo-500 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-slate-800">{a.nombre}</span>
+                    )}
+                    {a.link_daruma && (
+                      <p className="text-xs text-slate-400 truncate max-w-xs">{a.link_daruma}</p>
+                    )}
+                  </div>
                   {!a.activa && <span className="text-xs text-slate-400">(inactiva)</span>}
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   <button onClick={() => toggleActiva(a)} className={`p-1.5 rounded-lg text-xs ${a.activa ? 'hover:bg-amber-50 text-amber-600' : 'hover:bg-green-50 text-green-600'}`}>
                     <Eye size={14} />
                   </button>
@@ -451,6 +525,7 @@ function TabAreas({ areas, onReload }: { areas: AreaContexto[]; onReload: () => 
             )}
           </div>
         ))}
+        {areas.length === 0 && <p className="text-center text-slate-400 py-8">No hay áreas registradas.</p>}
       </div>
     </div>
   );

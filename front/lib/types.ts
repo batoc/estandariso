@@ -481,6 +481,7 @@ export interface AreaContexto {
   color?: string;
   orden?: number;
   activa: boolean;
+  link_daruma?: string;
 }
 
 export interface DofaElemento {
@@ -541,6 +542,7 @@ export interface Organizacion {
   resumen_estrategia?: string;
   mision?: string;
   vision?: string;
+  fecha_vigencia?: string;
   valores?: string[];
   logo_url?: string;
 }

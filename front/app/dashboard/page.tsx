@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { 
   ClipboardList, RefreshCw, MessageSquare, Target, Search, AlertTriangle,
   BarChart2, FileCheck, Truck, Box, ShieldAlert, Lightbulb, TrendingUp,
-  Plus, Info, Compass, Building2, ChevronRight
+  Plus, Compass, Building2, ChevronRight
 } from 'lucide-react';
 
 const CLAUSULA4 = [
@@ -89,16 +89,6 @@ export default function DashboardPage() {
               <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-indigo-400 transition-colors shrink-0" />
             </Link>
           ))}
-        </div>
-      </div>
-
-      {/* Footer note */}
-      <div className="flex items-start gap-3 bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
-        <Info size={18} className="text-indigo-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Todos los módulos están operativos. Seleccione cualquier tarjeta para gestionar sus registros.
-          </p>
         </div>
       </div>
     </div>

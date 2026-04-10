@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "estandarISO — Sistema de Gestión de Calidad",
+  title: "estandarISO",
   description: "Sistema de Gestión de Calidad ISO 9001:2015",
   icons: {
     icon: [
