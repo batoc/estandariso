@@ -3,11 +3,12 @@ set -e
 
 # ============================================
 # EstandarISO - Server Setup Script
-# Run this ONCE on a fresh Hetzner CPX11 server
-# Usage: ssh root@178.156.250.64 'bash -s' < deploy/setup-server.sh
+# Run this ONCE on a fresh server
+# Usage: ssh root@YOUR_SERVER_IP 'bash -s' < deploy/setup-server.sh
 # ============================================
 
-echo "=== EstandarISO Server Setup ==="
+SERVER_IP=$(curl -s ifconfig.me)
+echo "=== EstandarISO Server Setup (IP: $SERVER_IP) ==="
 
 # 1. Update system
 apt-get update && apt-get upgrade -y
@@ -114,8 +115,8 @@ ufw --force enable
 
 echo ""
 echo "=== Setup Complete ==="
-echo "Frontend: http://178.156.250.64"
-echo "PocketBase Admin: http://178.156.250.64/_/"
+echo "Frontend: http://$SERVER_IP"
+echo "PocketBase Admin: http://$SERVER_IP/_/"
 echo ""
 echo "IMPORTANT: First visit PocketBase Admin to create admin account!"
 echo ""

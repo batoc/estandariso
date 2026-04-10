@@ -10,9 +10,6 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# testing
-coverage/
-
 # next.js
 .next/
 out/
@@ -23,6 +20,7 @@ build/
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -30,16 +28,26 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*
+# env files (NEVER commit secrets)
+.env
+.env.*
+!.env.example
 
 # vercel
 .vercel
 
-# typescript
+# typescript auto-generated
 *.tsbuildinfo
 next-env.d.ts
 
-# PocketBase
+# root-level artifacts (project lives in front/)
+/package-lock.json
+/tsconfig.json
+/tsconfig.tsbuildinfo
+
+# PocketBase data & binary
 back/pb_data/
 back/pocketbase
+
+# IDE
+.idea/
